@@ -1,0 +1,57 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Hello LoginController!{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+
+<link rel="stylesheet" href="{{asset('styles/auth.css')}}">
+{% endblock %}
+
+
+{% block body %}
+<main class="auth-page-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <span class="brand-badge">Pure Botanical Care</span>
+            <h1>Welcome Back</h1>
+            <p>Sign in to manage your orders and skincare essentials</p>
+        </div>
+
+        {% if login_error is defined and login_error %}
+            <div class="auth-alert-error">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span>{{ login_error }}</span>
+            </div>
+        {% endif %}
+
+
+        <form class="auth-form" method="POST" action="">
+            <input type="hidden" name="request_type" value="login">
+
+            <div class="auth-form-group">
+                <label for="user_input">Username or Email</label>
+                <div class="auth-input-wrapper">
+                    <i class="fa-solid fa-user auth-input-icon"></i>
+                    <input type="text" id="user_input" name="user_input" placeholder="Enter username or email" value="{{ last_username }}" required autofocus>
+                </div>
+            </div>
+
+            <div class="auth-form-group">
+                <label for="password">Password</label>
+                <div class="auth-input-wrapper">
+                    <i class="fa-solid fa-lock auth-input-icon"></i>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required>
+                </div>
+            </div>
+
+            <button type="submit" name="login" class="auth-btn-submit">Sign In</button>
+        </form>
+
+        <div class="auth-footer-nav">
+            Don't have an account yet?
+            <a href="<?= BASE_URL ?>signup">Create an Account</a>
+        </div>
+    </div>
+</main>
+{% endblock %}

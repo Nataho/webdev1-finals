@@ -1,0 +1,101 @@
+<section class="account-panel">
+    <div class="panel-header-row">
+        <div>
+            <h2>Stock & Inventory</h2>
+            <p class="subtext">Manage current stock levels and inventory quantities for the store.</p>
+        </div>
+    </div>
+
+    <!-- Search Products -->
+    <form method="GET" class="tab-search-bar" action="#stock">
+        <input type="hidden" name="tab" value="stock">
+        <div class="search-input-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" name="stock_q" placeholder="Search product name..." value="<?= htmlspecialchars($_GET['stock_q'] ?? '') ?>">
+        </div>
+        <button type="submit" class="account-btn secondary">Search</button>
+        <?php if (!empty($_GET['stock_q'])): ?>
+            <a href="?tab=stock#stock" class="account-btn outline">Clear</a>
+        <?php endif; ?>
+    </form>
+
+    <!-- Products Stock Table -->
+    <div class="table-responsive">
+        <table class="account-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Price</th>
+                    <th>Current Stock</th>
+                    <th style="text-align: right;">Update Stock</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($admin_products_list)): ?>
+                    <tr>
+                        <td colspan="4" class="empty-table-cell">No products found.</td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($admin_products_list as $prod): ?>
+                        <?php 
+                        $qty = (int)$prod['product_stock_quantity'];
+                        $stock_badge_class = $qty <= 0 ? 'stock-out' : ($qty <= 5 ? 'stock-low' : 'stock-ok');
+                        $stock_badge_text = $qty <= 0 ? 'Out of stock' : ($qty <= 5 ? 'Low stock' : 'In stock');
+                        ?>
+                        <tr>
+                            <td>
+                                <div class="table-prod-name">
+                                    <strong><?= htmlspecialchars($prod['product_name']) ?></strong>
+                                    <span class="stock-pill <?= $stock_badge_class ?>"><?= $stock_badge_text ?></span>
+                                </div>
+                            </td>
+                            <td>₱<?= number_format((float)$prod['product_price'], 2) ?></td>
+                            <td>
+                                <strong style="font-size: 1.05rem;"><?= $qty ?></strong> <span style="font-size: 0.8rem; color: #888;">units</span>
+                            </td>
+                            <td style="text-align: right;">
+                                <div style="display: inline-flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                                    <form method="POST" class="stock-update-form" style="display: inline-flex; gap: 6px; align-items: center;">
+                                        <input type="hidden" name="action" value="update_stock">
+                                        <input type="hidden" name="product_id" value="<?= (int)$prod['product_id'] ?>">
+                                        <input type="number" name="stock_quantity" value="<?= $qty ?>" data-initial="<?= $qty ?>" min="0" step="1" required class="stock-input">
+                                        <button type="submit" class="table-btn-action primary" title="Save Stock" disabled>
+                                            <i class="fa-solid fa-check"></i> Save
+                                        </button>
+                                    </form>
+                                    <button type="button" class="table-btn-action danger" title="Delete Product" onclick="prepareDeleteProduct(<?= (int)$prod['product_id'] ?>)">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.stock-update-form').forEach(form => {
+                const input = form.querySelector('.stock-input');
+                const btn = form.querySelector('button[type="submit"]');
+                if (!input || !btn) return;
+
+                const checkChanged = () => {
+                    const initial = String(input.dataset.initial ?? '').trim();
+                    const current = String(input.value ?? '').trim();
+                    // Enable only if non-empty, changed from initial, and valid non-negative integer
+                    if (current !== '' && current !== initial && Number(current) >= 0) {
+                        btn.removeAttribute('disabled');
+                    } else {
+                        btn.setAttribute('disabled', 'disabled');
+                    }
+                };
+
+                input.addEventListener('input', checkChanged);
+                input.addEventListener('change', checkChanged);
+            });
+        });
+    </script>
+</section>

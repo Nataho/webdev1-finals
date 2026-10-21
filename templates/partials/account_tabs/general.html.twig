@@ -1,0 +1,49 @@
+<!-- Username Panel -->
+<section class="account-panel">
+    <h2>Username</h2>
+    <p class="subtext">Change your public display username.</p>
+    <form class="account-form" method="POST">
+        <input type="hidden" name="action" value="change_username">
+        <div class="account-field">
+            <label for="username">New Username</label>
+            <input type="text" id="username" name="username" value="{{ app.user.username }}" required minlength="3">
+        </div>
+        <button type="submit" class="account-btn">Update Username</button>
+    </form>
+</section>
+
+<!-- Password Panel -->
+<section class="account-panel">
+    <h2>Change Password</h2>
+    <p class="subtext">Ensure your account is using a long, random password.</p>
+    <form class="account-form" method="POST">
+        <input type="hidden" name="action" value="change_password">
+        <div class="account-field">
+            <label for="current_password">Current Password</label>
+            <input type="password" id="current_password" name="current_password" required autocomplete="current-password">
+        </div>
+        <div class="account-field">
+            <label for="new_password">New Password (at least 8 characters)</label>
+            <input type="password" id="new_password" name="new_password" required minlength="8" autocomplete="new-password">
+        </div>
+        <div class="account-field">
+            <label for="confirm_password">Confirm New Password</label>
+            <input type="password" id="confirm_password" name="confirm_password" required minlength="8" autocomplete="new-password">
+        </div>
+        <button type="submit" class="account-btn">Update Password</button>
+    </form>
+</section>
+
+{% if not is_granted("ROLE_ADMIN") %}
+<!-- Danger Zone (Delete Account) -->
+<section class="account-panel danger-zone">
+    <h2>Delete Account</h2>
+    <p class="subtext">Permanently remove your account and all associated profile data.</p>
+    <button type="button" class="account-btn danger" onclick="ConfirmTypeModal.open('deleteModal')">
+        <i class="fa-solid fa-trash"></i> Delete Account
+    </button>
+</section>
+{% endif %}
+
+
+{# <?php endif; ?> #}

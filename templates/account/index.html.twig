@@ -1,0 +1,212 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Hello AccountController!{% endblock %}
+{% block body_class %}account-page{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+
+<link rel="stylesheet" href="{{asset('styles/account.css')}}">
+{% endblock %}
+
+{% block body %}
+<main class="account-container">
+    <div class="account-header-bar">
+        <div>
+            <h1>Account Settings</h1>
+            <p style="margin: 4px 0 0 0; color: var(--palette-gray); font-size: 0.95rem;">
+                Manage your personal account preferences and access.
+            </p>
+        </div>
+        <button type="button" class="account-btn secondary" onclick="ConfirmModal.open('logoutModal')">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i> Log Out
+        </button>
+    </div>
+
+    {# FIXME #}
+    {# <?php if ($message): ?>
+        <div class="account-alert ok">
+            <i class="fa-solid fa-circle-check"></i>
+            <span><?= htmlspecialchars($message) ?></span>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($error): ?>
+        <div class="account-alert err">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span><?= htmlspecialchars($error) ?></span>
+        </div>
+    <?php endif; ?> #}
+
+    <div class="account-grid">
+        <!-- Sidebar / Profile Card & Left Tabs -->
+        <aside class="profile-card">
+
+            <div class="profile-avatar-container">
+            {# {% if avatar_url %} #}
+            {% if avatar_url %}
+                <img src="<?= htmlspecialchars($avatar_url) ?>" alt="Profile Picture" class="profile-avatar">
+            {% else %}
+                <div class="profile-avatar-placeholder">
+                    <i class="fa-solid fa-user"></i>
+                </div>
+            {% endif %}
+                {# <?php if ($avatar_url): ?>
+                    <img src="<?= htmlspecialchars($avatar_url) ?>" alt="Profile Picture" class="profile-avatar">
+                <?php else: ?>
+                    <div class="profile-avatar-placeholder">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                <?php endif; ?> #}
+            </div>
+
+            {# <h3><?= htmlspecialchars($user->name ?? 'User') ?></h3> #}
+            <h3>{{ user.username }}</h3>
+            {# <p class="user-email"><?= htmlspecialchars($user->email ?? '') ?></p> #}
+            <p class="user-email">{{ user.email }}</p>
+            {# <span class="profile-badge"><?= htmlspecialchars($user->role ?? 'Customer') ?></span> #}
+            <span class="profile-badge">{{ user.role }}</span>
+
+            <!-- Avatar Change Form -->
+            <form class="avatar-upload-form" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="update_avatar">
+                <label for="avatar_input" class="avatar-upload-label" title="Click to select a new profile photo">
+                    <i class="fa-solid fa-camera"></i> Change Photo
+                </label>
+                <input type="file" id="avatar_input" name="avatar" accept="image/*" required class="avatar-upload-input" onchange="this.form.submit()">
+            </form>
+
+            <!-- Left Navigation Tabs -->
+            <nav class="account-nav-tabs">
+                <a href="?tab=general" class="account-nav-tab <?= $active_tab === 'general' ? 'active' : '' ?>">
+                    <i class="fa-solid fa-user-gear"></i> General & Security
+                </a>
+                <a href="?tab=logs" class="account-nav-tab <?= $active_tab === 'logs' ? 'active' : '' ?>">
+                    {# <i class="fa-solid fa-clock-rotate-left"></i> <?= $user->is_admin() ? 'Store Logs & Orders' : 'My Orders' ?> #}
+                    <i class="fa-solid fa-clock-rotate-left"></i> {% if is_granted("ROLE_ADMIN") %} Store Logs & Orders {% else %} My Orders {% endif %}
+                </a>
+
+                {% if is_granted("ROLE_ADMIN") %}
+                    <div class="nav-group-title">Admin Controls</div>
+                    <a href="?tab=dashboard" class="account-nav-tab <?= $active_tab === 'dashboard' ? 'active' : '' ?>">
+                        <i class="fa-solid fa-chart-line"></i> Dashboard
+                    </a>
+                    <a href="?tab=users" class="account-nav-tab <?= $active_tab === 'users' ? 'active' : '' ?>">
+                        <i class="fa-solid fa-users"></i> Manage Users
+                    </a>
+                    <a href="?tab=stock" class="account-nav-tab <?= $active_tab === 'stock' ? 'active' : '' ?>">
+                        <i class="fa-solid fa-boxes-stacked"></i> Stock & Inventory
+                    </a>
+                    <a href="?tab=add_product" class="account-nav-tab <?= $active_tab === 'add_product' ? 'active' : '' ?>">
+                        <i class="fa-solid fa-plus-circle"></i> Add New Product
+                    </a>
+                {% endif %}
+                
+                {# <?php if ($user->is_admin()): ?>
+                    <div class="nav-group-title">Admin Controls</div>
+                    <a href="?tab=dashboard" class="account-nav-tab <?= $active_tab === 'dashboard' ? 'active' : '' ?>">
+                        <i class="fa-solid fa-chart-line"></i> Dashboard
+                    </a>
+                    <a href="?tab=users" class="account-nav-tab <?= $active_tab === 'users' ? 'active' : '' ?>">
+                        <i class="fa-solid fa-users"></i> Manage Users
+                    </a>
+                    <a href="?tab=stock" class="account-nav-tab <?= $active_tab === 'stock' ? 'active' : '' ?>">
+                        <i class="fa-solid fa-boxes-stacked"></i> Stock & Inventory
+                    </a>
+                    <a href="?tab=add_product" class="account-nav-tab <?= $active_tab === 'add_product' ? 'active' : '' ?>">
+                        <i class="fa-solid fa-plus-circle"></i> Add New Product
+                    </a>
+                <?php endif; ?> #}
+            </nav>
+        </aside>
+
+        <!-- Main Tab Content Area -->
+        <div class="account-panels">
+            {% if active_tab == "dashboard" %}
+                {% include "partials/account_tabs/dashboard.html.twig" %}
+                
+            {% elseif active_tab == "logs" %}
+                {% include "partials/account_tabs/logs.html.twig" %}
+
+            {% elseif active_tab == "users" %}
+                {% include "partials/account_tabs/users.html.twig" %}
+            
+            {% elseif active_tab == "stock" %}
+                {% include "partials/account_tabs/stock.html.twig" %}
+
+            {% elseif active_tab == "add_product" %}
+                {% include "partials/account_tabs/add_product.html.twig" %}
+            
+            {% else %}
+                {% include "partials/account_tabs/general.html.twig" %}
+
+            {% endif %}
+            
+            {# <?php 
+            // load the active component tab
+            switch ($active_tab) {
+                case 'dashboard':
+                    if ($user->is_admin()) {
+                        require __DIR__ . '/tabs/dashboard.php';
+                    }
+                    break;
+                case 'logs':
+                    require __DIR__ . '/tabs/logs.php';
+                    break;
+                case 'users':
+                    if ($user->is_admin()) {
+                        require __DIR__ . '/tabs/users.php';
+                    }
+                    break;
+                case 'stock':
+                    if ($user->is_admin()) {
+                        require __DIR__ . '/tabs/stock.php';
+                    }
+                    break;
+                case 'add_product':
+                    if ($user->is_admin()) {
+                        require __DIR__ . '/tabs/add_product.php';
+                    }
+                    break;
+                case 'general':
+                default:
+                    require __DIR__ . '/tabs/general.php';
+                    break;
+            }
+            ?> #}
+        </div>
+    </div>
+</main>
+
+<!-- Modals -->
+<?php 
+$logoutModal->render();
+if ($deleteModal) {
+    $deleteModal->render();
+}
+if ($deleteProductModal) {
+    $deleteProductModal->render();
+}
+if ($alertModal) {
+    $alertModal->render();
+}
+?>
+
+<?php require ROOT_DIR . 'components/modal_scripts.php'; ?>
+
+<script>
+    // set the product_id in the delete product modal before opening it
+    function prepareDeleteProduct(productId) {
+        document.querySelector('#deleteProductModal input[name="product_id"]').value = productId;
+        ConfirmTypeModal.open('deleteProductModal');
+    }
+</script>
+
+<?php if ($alertModal): ?>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        AlertModal.open('accountAlertModal');
+    });
+</script>
+<?php endif; ?>
+{% endblock %}

@@ -1,0 +1,123 @@
+<section class="account-panel">
+    <div class="panel-header-row">
+        <div>
+            <h2>Manage Users</h2>
+            <p class="subtext">Search customer accounts, view their roles, and manage access.</p>
+        </div>
+    </div>
+
+    <!-- Search / Filter Bar -->
+    <form method="GET" class="tab-search-bar" action="#users">
+        <input type="hidden" name="tab" value="users">
+        <div class="search-input-wrap">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            {# <input type="text" name="user_q" placeholder="Search by username or email..." value="<?= htmlspecialchars($_GET['user_q'] ?? '') ?>"> #}
+            <input type="text" name="user_q" placeholder="Search by username or email..." value="{{ user_q }}">
+        </div>
+        <button type="submit" class="account-btn secondary">Search</button>
+        {% if user_q is not empty %}
+            <a href="?tab=users#users" class="account-btn outline">Clear</a>
+        {% endif %}
+    </form>
+
+    <!-- Users Table -->
+    <div class="table-responsive">
+        <table class="account-table">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Role / Status</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if admin_users_list is empty %}
+                    <tr>
+                        <td colspan="4" class="empty-table-cell">No accounts found matching your search.</td>
+                    </tr>
+                {% else %}
+                    {% for u in admin_users_list %}
+                        <tr>
+                            <td>
+                                <div class="table-user-cell">
+                                    {# <strong><?= htmlspecialchars($u['user_name']) ?></strong> #}
+                                    <strong>{{ u.user_name }}</strong>
+                                    {% if u.user_id == user.id %}
+                                        <span class="badge-mini you">You</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            {# <td><?= htmlspecialchars($u['user_email']) ?></td> #}
+                            <td>{{ u.user_email }}</td>
+                            <td>
+                                {% if u.user_role == "banned"%}
+                                    <span class="badge-status banned"><i class="fa-solid fa-ban"></i> Banned</span>
+                                {% elseif u.user_role == "admin" %}
+                                    <span class="badge-status admin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
+                                {% else %}
+                                    <span class="badge-status active"><i class="fa-solid fa-circle-check"></i> Customer</span>
+                                {% endif %}
+                                {# <?php if ($u['user_role'] === 'banned'): ?>
+                                    <span class="badge-status banned"><i class="fa-solid fa-ban"></i> Banned</span>
+                                <?php elseif ($u['user_role'] === 'admin'): ?>
+                                    <span class="badge-status admin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
+                                <?php else: ?>
+                                    <span class="badge-status active"><i class="fa-solid fa-circle-check"></i> Customer</span>
+                                <?php endif; ?> #}
+                            </td>
+                            <td style="text-align: right;">
+                                {% if u.user_id != user.id %}
+                                    {% if u.user_role == "banned" %}
+                                    {# unban form #}
+                                        <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
+                                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
+                                            <input type="hidden" name="action" value="toggle_user_ban">
+                                            <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
+                                            <input type="hidden" name="target_action" value="unban">
+                                            <button type="submit" class="table-btn-action success" title="Unban User">
+                                                <i class="fa-solid fa-unlock"></i> Unban
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                    {# ban form #}
+                                        <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
+                                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
+                                            <input type="hidden" name="action" value="toggle_user_ban">
+                                            <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
+                                            <input type="hidden" name="target_action" value="ban">
+                                            <button type="submit" class="table-btn-action danger" title="Ban User">
+                                                <i class="fa-solid fa-ban"></i> Ban
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                
+                                    {# <?php if ($u['user_role'] === 'banned'): ?>
+                                    
+                                        <!-- Unban form -->
+                                        
+                                    <?php else: ?>
+                                        <!-- Ban form -->
+
+                                    <?php endif; ?> #}
+                                {% else %}
+                                    <span style="font-size: 0.8rem; color: var(--palette-gray); italic;">(Self)</span>
+                                    
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                {# <?php if (empty($admin_users_list)): ?>
+                    <tr>
+                        <td colspan="4" class="empty-table-cell">No accounts found matching your search.</td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($admin_users_list as $u): ?>
+                        
+                    <?php endforeach; ?>
+                <?php endif; ?> #}
+            </tbody>
+        </table>
+    </div>
+</section>

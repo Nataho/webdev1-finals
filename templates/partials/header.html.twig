@@ -1,0 +1,16 @@
+<header>
+        <h1>ESTRERA BOTANICALS</h1>
+        <nav>
+            <a class="heading-nav" href="{{ path('app_home') }}">HOME</a>
+            <a class="heading-nav" href="{{ path('app_shop') }}"> SHOP</a>
+            <a class="heading-nav" href="{{ path('app_shop', {filter: 'best_sellers'}) }}">BEST SELLERS</a>
+            <a class="heading-nav" href="{{ path('app_about_us') }}">ABOUT US</a>
+
+            {% if app.user %} {# if user exsists #}
+                <a class="heading-nav" id="heading-cta-button" href="{{ path('app_account') }}">My Account</a>
+            {% else %} {# if user don't exsist #}
+                <a class="heading-nav" id="heading-cta-button" href="{{ path('app_shop') }}">Shop Now</a>
+            {% endif %}
+            {# <a class="heading-nav" id="heading-cta-button" href=<?= $heading_button_path ?>><?=$heading_button_text?></a> #}
+        </nav>
+</header>

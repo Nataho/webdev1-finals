@@ -1,0 +1,87 @@
+<section class="account-panel">
+    <div class="panel-header-row">
+        <div>
+            {# <h2><?= $user->is_admin() ? 'Store Activity & Order Logs' : 'My Order History' ?></h2> #}
+            <h2>
+                {% if is_granted("ROLE_ADMIN") %}
+                    Store Activity
+                {% else %}
+                    Order Logs
+                {% endif %}</h2>
+            <p class="subtext">
+                {% if is_granted("ROLE_ADMIN") %}
+                    Review customer orders, transaction dates, and fulfillment status.
+                {% else %}
+                    Track your recent purchases and delivery details.
+                {% endif %}
+                {# <?= $user->is_admin() 
+                    ? 'Review customer orders, transaction dates, and fulfillment status.' 
+                    : 'Track your recent purchases and delivery details.' ?> #}
+            </p>
+        </div>
+    </div>
+
+    <!-- Logs / Orders Table -->
+    <div class="table-responsive">
+        <table class="account-table">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    {% if is_granted("ROLE_ADMIN") %}
+                    <th>Customer</th>
+                    {% endif %}
+                    
+                    {# <?php if ($user->is_admin()): ?>
+                        <th>Customer</th>
+                    <?php endif; ?> #}
+                    <th>Date & Time</th>
+                    <th>Total Amount</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if orders_list is empty %}
+                    <tr>
+                        <td colspan="{{ is_granted('ROLE_ADMIN') ? 6 : 5 }}" class="empty-table-cell">
+                            <i class="fa-solid fa-receipt" style="font-size: 2rem; color: #cbd5e1; display: block; margin-bottom: 8px;"></i>
+                            No orders found yet.
+                        </td>
+                    </tr>
+                {% else %}
+                    {% for order in orders_list %}
+                        <tr>
+                            <td>
+                                <strong>#{{ '%05d'|format(order.order_id) }}</strong>
+                            </td>
+                            {% if is_granted("ROLE_ADMIN") %}
+                                <td>
+                                    <div>
+                                        <strong>{{ order.user_name|default('Unknown') }}</strong>
+                                        <div style="font-size: 0.8rem; color: var(--palette-gray);">{{ order.user_email|default('') }}</div>
+                                    </div>
+                                </td>
+                            {% endif %}
+                            <td>
+                                {{ order.order_date|date('M d, Y · h:i A') }}
+                            </td>
+                            <td>
+                                <strong>₱{{ order.total_amount|number_format(2) }}</strong>
+                            </td>
+                            <td>
+                                {% set status = (order.status|default('pending'))|lower %}
+                                {% set status_class = status in ['completed', 'delivered'] ? 'badge-status active' : (status in ['cancelled', 'declined'] ? 'badge-status banned' : 'badge-status pending') %}
+                                <span class="{{ status_class }}">{{ order.status|default('Pending')|capitalize }}</span>
+                            </td>
+                            <td style="text-align: right;">
+                                <a href="#" class="table-btn-action primary" style="text-decoration: none; display: inline-flex;" title="View Order Summary">
+                                    <i class="fa-solid fa-file-invoice"></i> View Summary
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</section>

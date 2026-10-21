@@ -1,0 +1,132 @@
+<div class="panel-header-row">
+    <div>
+        <h2>Admin Overview & Dashboard</h2>
+        <p class="subtext">Real-time overview of store activity, products, and customer orders.</p>
+    </div>
+    {# <a href="<?= BASE_URL ?>admin/upload" class="account-btn secondary" style="text-decoration: none;">
+        <i class="fa-solid fa-photo-film"></i> Media Gallery
+    </a> #}
+</div>
+
+<!-- Stat Counters -->
+<div class="admin-stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-users"></i></div>
+        <div class="stat-meta">
+            <h4>Total Accounts</h4>
+            <span>{{ users_count }}</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
+        <div class="stat-meta">
+            <h4>Products in Catalog</h4>
+            <span>{{ products_count }}</span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon"><i class="fa-solid fa-receipt"></i></div>
+        <div class="stat-meta">
+            <h4>Total Orders</h4>
+            <span>{{ orders_count }}</span>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Order Logs Table -->
+<section class="account-panel" style="padding: 0; border: none; box-shadow: none; background: transparent;">
+    <div class="panel-header-row" style="margin-top: 24px;">
+        <div>
+            <h3 style="font-family: var(--heading-font); color: var(--palette-dark-green); font-size: 1.3rem; margin: 0 0 4px 0;">Recent Orders</h3>
+            <p class="subtext">Latest purchases placed in the shop.</p>
+        </div>
+        <a href="?tab=logs" class="account-btn outline" style="padding: 8px 14px; font-size: 0.85rem;">
+            View Full Logs &rarr;
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="account-table">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Customer</th>
+                    <th>Date</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+                {% if recent_orders is empty %}
+                    <tr>
+                        <td colspan="6" class="empty-table-cell">No recent orders found.</td>
+                    </tr>
+                {% else %}
+                    {% for order in recent_orders %}  
+                        <tr>
+                            {# <td><strong>#<?= str_pad((string)$order['order_id'], 5, '0', STR_PAD_LEFT) ?></strong></td> #}
+                            <td><strong>#{{ '%05d'|format(order.order_id) }}</strong></td>
+                            <td>
+                                {# <strong><?= htmlspecialchars($order['user_name'] ?? 'Unknown') ?></strong> #}
+                                <strong>{{order.user_name ?? "unknown"}}</strong>
+                                {# <span style="display: block; font-size: 0.8rem; color: var(--palette-gray);"><?= htmlspecialchars($order['user_email'] ?? '') ?></span> #}
+                                <span style="display: block; font-size: 0.8rem; color: var(--palette-gray);">{{ order.user_email ?? '' }}</span>
+                            </td>
+                            {# <td><?= date('M d, Y · h:i A', strtotime($order['order_date'])) ?></td> #}
+                            <td>{{ order.order_date|date('M d, Y · h:i A') }}</td>
+                            {# <td><strong>₱<?= number_format((float)$order['total_amount'], 2) ?></strong></td> #}
+                            <td><strong>₱{{ order.total_amount|number_format(2) }}</strong></td>
+
+                            <td>
+                                {% set status = (order.status ?? 'pending')|lower %}
+                                {% set status_class = status in ['completed', 'delivered'] ? 'badge-status active' : (status in ['cancelled', 'declined'] ? 'badge-status banned' : 'badge-status pending') %}
+                                
+                                <span class="{{ status_class }}">{{ (order.status ?? 'Pending')|capitalize }}</span>
+                            </td>
+                            <td style="text-align: right;">
+                                <a href="<?= BASE_URL ?>checkout/summary.php?order_id=<?= (int)$order['order_id'] ?>" class="table-btn-action primary" style="text-decoration: none; display: inline-flex; padding: 6px 12px; font-size: 0.8rem;" title="View Order Summary">
+                                    <i class="fa-solid fa-file-invoice"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                {# <?php if (empty($recent_orders_dashboard)): ?>
+                    <tr>
+                        <td colspan="6" class="empty-table-cell">No recent orders found.</td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($recent_orders_dashboard as $order): ?>
+                        <tr>
+                            <td><strong>#<?= str_pad((string)$order['order_id'], 5, '0', STR_PAD_LEFT) ?></strong></td>
+                            <td>
+                                <strong><?= htmlspecialchars($order['user_name'] ?? 'Unknown') ?></strong>
+                                <span style="display: block; font-size: 0.8rem; color: var(--palette-gray);"><?= htmlspecialchars($order['user_email'] ?? '') ?></span>
+                            </td>
+                            <td><?= date('M d, Y · h:i A', strtotime($order['order_date'])) ?></td>
+                            <td><strong>₱<?= number_format((float)$order['total_amount'], 2) ?></strong></td>
+                            <td>
+                                <?php 
+                                $status = strtolower($order['status'] ?? 'pending');
+                                $status_class = match($status) {
+                                    'completed', 'delivered' => 'badge-status active',
+                                    'cancelled', 'declined' => 'badge-status banned',
+                                    default => 'badge-status pending'
+                                };
+                                ?>
+                                <span class="<?= $status_class ?>"><?= ucfirst(htmlspecialchars($order['status'] ?? 'Pending')) ?></span>
+                            </td>
+                            <td style="text-align: right;">
+                                <a href="<?= BASE_URL ?>checkout/summary.php?order_id=<?= (int)$order['order_id'] ?>" class="table-btn-action primary" style="text-decoration: none; display: inline-flex; padding: 6px 12px; font-size: 0.8rem;" title="View Order Summary">
+                                    <i class="fa-solid fa-file-invoice"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?> #}
+            </tbody>
+        </table>
+    </div>
+</section>

@@ -1,0 +1,41 @@
+<section class="account-panel">
+    <h2>Add New Product</h2>
+    <p class="subtext">Create a new item to display and sell in the store catalog.</p>
+
+    <form class="account-form" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="action" value="add_product">
+        
+        <div class="account-field">
+            <label for="product_name">Product Name *</label>
+            <input type="text" id="product_name" name="product_name" placeholder="e.g. Lavender Herbal Toner" required>
+        </div>
+
+        <div class="form-row-2col">
+            <div class="account-field">
+                <label for="product_price">Price (₱) *</label>
+                <input type="number" id="product_price" name="product_price" step="0.01" min="0" placeholder="0.00" required>
+            </div>
+            <div class="account-field">
+                <label for="product_stock_quantity">Initial Stock Quantity *</label>
+                <input type="number" id="product_stock_quantity" name="product_stock_quantity" min="0" step="1" value="10" required>
+            </div>
+        </div>
+
+        <div class="account-field">
+            <label for="product_description">Product Description</label>
+            <textarea id="product_description" name="product_description" rows="4" placeholder="Describe the botanical ingredients, benefits, and how to use..."></textarea>
+        </div>
+
+        <div class="account-field">
+            <label for="product_image">Product Image (Optional)</label>
+            <input type="file" id="product_image" name="product_image" accept="image/*">
+            <small style="font-size: 0.8rem; color: var(--palette-gray); margin-top: 4px; display: block;">
+                Accepts JPG, PNG, GIF, WEBP up to 5MB. Uploads directly to <code>eb-uploads</code>.
+            </small>
+        </div>
+
+        <button type="submit" class="account-btn" style="margin-top: 10px;">
+            <i class="fa-solid fa-plus"></i> Create Product
+        </button>
+    </form>
+</section>

@@ -1,0 +1,77 @@
+{# Modal helpers: styles + open/close/dismiss behavior for ConfirmModal,
+   ConfirmTypeModal and AlertModal (JS from the previous modal_scripts.php). #}
+<link rel="stylesheet" href="{{ asset('styles/modal.css') }}">
+
+<script>
+    // modal dialog helpers
+    const ConfirmModal = {
+        open(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'flex';
+        },
+        close(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        }
+    };
+
+    const ConfirmTypeModal = {
+        open(id) {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.display = 'flex';
+                const input = document.getElementById(id + '_input');
+                const btn = document.getElementById(id + '_btn');
+                if (input) {
+                    input.value = '';
+                    setTimeout(() => input.focus(), 50);
+                }
+                if (btn) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.5';
+                    btn.style.cursor = 'not-allowed';
+                }
+            }
+        },
+        close(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        },
+        check(id, expected) {
+            const input = document.getElementById(id + '_input');
+            const btn = document.getElementById(id + '_btn');
+            if (input && btn) {
+                const match = input.value.trim() === expected;
+                btn.disabled = !match;
+                btn.style.opacity = match ? '1' : '0.5';
+                btn.style.cursor = match ? 'pointer' : 'not-allowed';
+            }
+        }
+    };
+
+    const AlertModal = {
+        open(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'flex';
+        },
+        close(id) {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        }
+    };
+
+    // dismiss on escape or backdrop click
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            document.querySelectorAll('.confirm-modal-overlay').forEach(m => m.style.display = 'none');
+        }
+    });
+
+    document.querySelectorAll('.confirm-modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.style.display = 'none';
+            }
+        });
+    });
+</script>

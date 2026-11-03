@@ -18,15 +18,12 @@
     </ul>
 </div> #}
 
-    <!-- an "AHA!" moment here. always loved oop -->
-    {# <?php require ROOT_DIR . 'components/header.php' ?> #}
-
     <div class="hero-image-container">
         <img id="img1" src="{{asset('images/1.png')}}" alt="heading image">
         <div class="overlay-content">
             <h1>Chebula Active Serum</h1>
             <p>A clinically proven serum that works at the cellular level to boost <br>your skin s natural collagen for more radiant, resilient skin.</p>
-            <a class="btn" href="<?= BASE_URL ?>shop"> Shop Now</a>
+            <a class="btn" href="{{ path('app_shop') }}"> Shop Now</a>
         </div>
     </div>
 
@@ -65,14 +62,14 @@
                 <img src="{{asset("images/6.png")}}" alt="Sensitive Skin">
                 <div class="concern-content">
                     <h2>Sensitive Skin</h2>
-                    <a href="<?= BASE_URL ?>shop">Shop Now</a>
+                    <a href="{{ path('app_shop') }}">Shop Now</a>
                 </div>
             </div>
             <div class="concern-card">
                 <img src="{{asset("images/7.png")}}" alt="Breakouts & Blemishes">
                 <div class="concern-content">
                     <h2>Breakouts & Blemishes</h2>
-                    <a href="<?= BASE_URL ?>shop">Shop Now</a>
+                    <a href="{{ path('app_shop') }}">Shop Now</a>
                 </div>
             </div>
         </div>
@@ -85,7 +82,7 @@
             <h1>Midnight Recovery Oil</h1>
             <p id="ingredients">Bloe Tansy & Jojova Infusion</p>
             <p>30ml | 1.08oz</p>
-            <a class="btn" href="<?= BASE_URL ?>shop">Shop Now</a>
+            <a class="btn" href="{{ path('app_shop') }}">Shop Now</a>
         </div>
     </section>
 

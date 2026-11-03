@@ -1,0 +1,23 @@
+{# Single-button notice modal (port of the AlertModal PHP component). #}
+{% set is_error = (type|default('success')) in ['error', 'danger', 'failed'] %}
+<div id="{{ id }}" class="confirm-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="confirm-modal-box">
+        <div class="{{ is_error ? 'confirm-modal-icon error' : 'confirm-modal-icon success' }}">
+            <i class="{{ is_error ? 'fa-solid fa-circle-xmark' : 'fa-solid fa-circle-check' }}"></i>
+        </div>
+        <div class="confirm-modal-body">
+            <p class="confirm-modal-message">{{ message }}</p>
+        </div>
+        <div class="confirm-modal-actions">
+            {% if redirect_url is defined and redirect_url %}
+                <a href="{{ redirect_url }}" class="{{ is_error ? 'btn-modal-confirm danger' : 'btn-modal-confirm' }}" style="text-decoration: none; width: 100%;">
+                    {{ button_label ?? 'Continue' }}
+                </a>
+            {% else %}
+                <button type="button" class="{{ is_error ? 'btn-modal-confirm danger' : 'btn-modal-confirm' }}" style="width: 100%;" onclick="AlertModal.close('{{ id }}')">
+                    {{ button_label ?? 'Continue' }}
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</div>

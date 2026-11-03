@@ -2,7 +2,8 @@
 <section class="account-panel">
     <h2>Username</h2>
     <p class="subtext">Change your public display username.</p>
-    <form class="account-form" method="POST">
+    <form class="account-form" method="POST" action="{{ path('app_account') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('change_username') }}">
         <input type="hidden" name="action" value="change_username">
         <div class="account-field">
             <label for="username">New Username</label>
@@ -16,7 +17,8 @@
 <section class="account-panel">
     <h2>Change Password</h2>
     <p class="subtext">Ensure your account is using a long, random password.</p>
-    <form class="account-form" method="POST">
+    <form class="account-form" method="POST" action="{{ path('app_account') }}">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('change_password') }}">
         <input type="hidden" name="action" value="change_password">
         <div class="account-field">
             <label for="current_password">Current Password</label>
@@ -44,6 +46,3 @@
     </button>
 </section>
 {% endif %}
-
-
-{# <?php endif; ?> #}

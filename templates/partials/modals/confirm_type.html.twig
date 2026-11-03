@@ -1,0 +1,43 @@
+{# Confirmation modal that requires typing a word to enable the button
+   (port of the ConfirmTypeModal PHP component). #}
+{% set method = (method ?? 'POST')|upper %}
+{% set hidden = hidden ?? {} %}
+{% set input_id = id ~ '_input' %}
+{% set btn_id = id ~ '_btn' %}
+<div id="{{ id }}" class="confirm-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="confirm-modal-box">
+        <div class="confirm-modal-icon">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="confirm-modal-body">
+            <p class="confirm-modal-message">{{ message }}</p>
+            <p style="font-family: var(--document-font); font-size: 0.9rem; color: var(--palette-gray); margin-bottom: 12px;">
+                To confirm, please type <strong style="color: #991b1b; user-select: all; font-family: monospace; font-size: 1rem; background: #fee2e2; padding: 2px 6px; border-radius: 4px;">{{ word }}</strong> below:
+            </p>
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="{{ input_id }}"
+                       class="confirm-type-input"
+                       placeholder="Type '{{ word }}'"
+                       autocomplete="off"
+                       style="width: 100%; padding: 10px 14px; border: 1.5px solid #d8e2d7; border-radius: 8px; font-family: inherit; font-size: 0.95rem; text-align: center; outline: none; box-sizing: border-box;"
+                       oninput="ConfirmTypeModal.check('{{ id }}', '{{ word }}')">
+            </div>
+        </div>
+        <div class="confirm-modal-actions">
+            <form method="{{ method }}" action="{{ action_url }}" style="display: inline-flex; gap: 10px; width: 100%;">
+                {% for name, value in hidden %}
+                    <input type="hidden" name="{{ name }}" value="{{ value }}">
+                {% endfor %}
+                {% if csrf_token_id is defined and csrf_token_id %}
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token(csrf_token_id) }}">
+                {% endif %}
+                <button type="button" class="btn-modal-cancel" onclick="ConfirmTypeModal.close('{{ id }}')">
+                    {{ cancel_label ?? 'Cancel' }}
+                </button>
+                <button type="submit" id="{{ btn_id }}" class="btn-modal-confirm danger" disabled style="opacity: 0.5; cursor: not-allowed;">
+                    {{ confirm_label ?? 'Confirm' }}
+                </button>
+            </form>
+        </div>
+    </div>
+</div>

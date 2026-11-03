@@ -1,0 +1,37 @@
+{# Simple confirmation modal (port of the ConfirmModal PHP component).
+   Renders a plain confirm/cancel dialog; if action_url is set the confirm
+   button submits the hidden fields as a form. #}
+<div id="{{ id }}" class="confirm-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="confirm-modal-box">
+        <div class="confirm-modal-icon">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <div class="confirm-modal-body">
+            <p class="confirm-modal-message">{{ message }}</p>
+        </div>
+        <div class="confirm-modal-actions">
+            {% set method = (method ?? 'POST')|upper %}
+            {% set hidden = hidden ?? {} %}
+            {% if action_url is defined and action_url %}
+                <form method="{{ method }}" action="{{ action_url }}" style="display: inline-flex; gap: 10px; width: 100%;">
+                    {% for name, value in hidden %}
+                        <input type="hidden" name="{{ name }}" value="{{ value }}">
+                    {% endfor %}
+                    <button type="button" class="btn-modal-cancel" onclick="ConfirmModal.close('{{ id }}')">
+                        {{ cancel_label ?? 'Cancel' }}
+                    </button>
+                    <button type="submit" class="btn-modal-confirm {{ confirm_class|default('danger') }}">
+                        {{ confirm_label ?? 'Confirm' }}
+                    </button>
+                </form>
+            {% else %}
+                <button type="button" class="btn-modal-cancel" onclick="ConfirmModal.close('{{ id }}')">
+                    {{ cancel_label ?? 'Cancel' }}
+                </button>
+                <button type="button" class="btn-modal-confirm {{ confirm_class|default('danger') }}" id="{{ id }}_confirmBtn">
+                    {{ confirm_label ?? 'Confirm' }}
+                </button>
+            {% endif %}
+        </div>
+    </div>
+</div>

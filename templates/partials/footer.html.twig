@@ -11,24 +11,24 @@
                 </div>
             </div>
             <div class="footer-links">
-                <div class="footer-column">
-                    <h3>Shop</h3>
-                    <a href="<?= BASE_URL ?>shop">NEW</a>
-                    <a href="<?= BASE_URL ?>shop?filter=best_sellers">SETS</a>
-                    <a href="<?= BASE_URL ?>shop">BUILD YOUR BUNDLE</a>
-                </div>
-                <div class="footer-column">
-                    <h3>Learn</h3>
-                    <a href="<?= BASE_URL ?>about-us">ABOUT US</a>
-                    <a href="<?= BASE_URL ?>faq#sustainability">SUSTAINABILITY</a>
-                    <a href="<?= BASE_URL ?>#fifth-heading">GET A FREE GIFT</a>
-                </div>
-                <div class="footer-column">
-                    <h3>Help</h3>
-                    <a href="<?= BASE_URL ?>faq#faqs">FAQs</a>
-                    <a href="<?= BASE_URL ?>faq#returns">RETURNS</a>
-                    <a href="<?= BASE_URL ?>faq#shipping">SHIPPING & DELIVERY</a>
-                </div>
+            <div class="footer-column">
+                <h3>Shop</h3>
+                <a href="{{ path('app_shop') }}">NEW</a>
+                <a href="{{ path('app_shop', { filter: 'best_sellers' }) }}">SETS</a>
+                <a href="{{ path('app_shop') }}">BUILD YOUR BUNDLE</a>
+            </div>
+            <div class="footer-column">
+                <h3>Learn</h3>
+                <a href="{{ path('app_about_us') }}">ABOUT US</a>
+                <a href="{{ path('app_faq') }}#sustainability">SUSTAINABILITY</a>
+                <a href="{{ path('app_home') }}#fifth-heading">GET A FREE GIFT</a>
+            </div>
+            <div class="footer-column">
+                <h3>Help</h3>
+                <a href="{{ path('app_faq') }}#faqs">FAQs</a>
+                <a href="{{ path('app_faq') }}#returns">RETURNS</a>
+                <a href="{{ path('app_faq') }}#shipping">SHIPPING & DELIVERY</a>
+            </div>
             </div>
         </div>
     </footer>

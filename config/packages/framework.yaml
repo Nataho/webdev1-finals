@@ -2,6 +2,9 @@
 framework:
     secret: '%env(APP_SECRET)%'
 
+    # form submissions (login, account actions...) are CSRF-protected
+    csrf_protection: true
+
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 

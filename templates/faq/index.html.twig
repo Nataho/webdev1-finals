@@ -1,0 +1,211 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}FAQ & Help Center | Estrera Botanicals{% endblock %}
+{% block body_class %}faq-page{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<link rel="stylesheet" href="{{ asset('styles/faq.css') }}">
+{% endblock %}
+
+{% block body %}
+    <section class="faq-hero">
+        <span class="faq-hero-badge">Help & Support</span>
+        <h1>How Can We Help You?</h1>
+        <p>Find answers to common questions about our botanical formulas, orders, shipping rates, and sustainability commitment.</p>
+    </section>
+
+    <!-- Quick Navigation Pills -->
+    <nav class="faq-nav-container" aria-label="FAQ Topics">
+        <a href="#faqs" class="faq-nav-pill"><i class="fa-solid fa-circle-question"></i> FAQs</a>
+        <a href="#shipping" class="faq-nav-pill"><i class="fa-solid fa-truck-fast"></i> Shipping & Delivery</a>
+        <a href="#returns" class="faq-nav-pill"><i class="fa-solid fa-rotate-left"></i> Returns & Refunds</a>
+        <a href="#sustainability" class="faq-nav-pill"><i class="fa-solid fa-leaf"></i> Sustainability</a>
+    </nav>
+
+    <main class="faq-container">
+        <!-- 1. GENERAL PRODUCT & BRAND FAQS -->
+        <section class="faq-section" id="faqs">
+            <div class="faq-section-header">
+                <div class="faq-section-icon">
+                    <i class="fa-solid fa-circle-question"></i>
+                </div>
+                <h2>Frequently Asked Questions</h2>
+            </div>
+            <div class="faq-accordion">
+                <details class="faq-item" open>
+                    <summary class="faq-question">
+                        <span>Are Estrera Botanicals products 100% natural and plant-based?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>Yes. Every single formula is formulated using pure plant-based oils, botanical extracts, and natural actives. We never use parabens, sulfates, synthetic fragrances, silicones, or petroleum derivatives.</p>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="faq-question">
+                        <span>Are your skincare products suitable for sensitive skin?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>Our formulations are dermatologically tested and specifically curated to calm irritated and barrier-compromised skin. We recommend patch testing on the inner forearm 24 hours prior to full facial application.</p>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="faq-question">
+                        <span>How should I store botanical serums and oils?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>Keep bottles tightly sealed in a cool, dry place away from direct sunlight. Because we avoid chemical stabilizers, storing at room temperature (below 30°C) ensures peak botanical potency for up to 12 months after opening.</p>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="faq-question">
+                        <span>Are your products cruelty-free and vegan?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>Absolutely. We love animals and never test on them at any stage of product research or production. All of our active ingredients are 100% vegan.</p>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <!-- 2. SHIPPING & DELIVERY -->
+        <section class="faq-section" id="shipping">
+            <div class="faq-section-header">
+                <div class="faq-section-icon">
+                    <i class="fa-solid fa-truck-fast"></i>
+                </div>
+                <h2>Shipping & Delivery</h2>
+            </div>
+            <div class="faq-accordion">
+                <details class="faq-item" open>
+                    <summary class="faq-question">
+                        <span>How long does shipping take within the Philippines?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>Orders are dispatched within 24 hours of placement (excluding Sundays). Expected delivery transit times:</p>
+                        <ul style="margin: 8px 0; padding-left: 20px;">
+                            <li><strong>Metro Manila / Central Luzon:</strong> 1 to 3 business days</li>
+                            <li><strong>Provincial Luzon:</strong> 2 to 4 business days</li>
+                            <li><strong>Visayas & Mindanao:</strong> 4 to 7 business days</li>
+                        </ul>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="faq-question">
+                        <span>How much is shipping and is there free shipping?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>Standard nationwide flat-rate shipping is <strong>₱120.00</strong>. Orders totaling <strong>₱1,500.00</strong> or more qualify for automatic free standard shipping.</p>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="faq-question">
+                        <span>How can I track my order once placed?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>You can check the status of your order anytime under your <a href="{{ path('app_account') }}" style="color: var(--palette-dark-green); font-weight: 600;">My Account &rarr; Orders</a> tab. In addition, you can view your digital invoice anytime on your Order Summary page.</p>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <!-- 3. RETURNS & REFUNDS -->
+        <section class="faq-section" id="returns">
+            <div class="faq-section-header">
+                <div class="faq-section-icon">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </div>
+                <h2>Returns & Replacements</h2>
+            </div>
+            <div class="faq-accordion">
+                <details class="faq-item" open>
+                    <summary class="faq-question">
+                        <span>What is your 14-day botanical satisfaction guarantee?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>We believe deeply in our botanical formulas. If you experience an adverse reaction or are dissatisfied with a product within 14 days of receipt, reach out to our team with proof of purchase for an exchange or store credit.</p>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="faq-question">
+                        <span>What if my package arrived damaged or leaked during transit?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>We pack every bottle carefully in biodegradable cushioning. In the rare event of transit damage, please send a photo of the damaged package and your Order ID to our support within 48 hours and we will ship an expedited replacement free of charge.</p>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <!-- 4. SUSTAINABILITY & MISSION -->
+        <section class="faq-section" id="sustainability">
+            <div class="faq-section-header">
+                <div class="faq-section-icon">
+                    <i class="fa-solid fa-leaf"></i>
+                </div>
+                <h2>Sustainability & Clean Beauty</h2>
+            </div>
+            <div class="faq-accordion">
+                <details class="faq-item" open>
+                    <summary class="faq-question">
+                        <span>What packaging materials do you use?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>We package our botanical oils and serums in 100% recyclable UV-protective amber glass bottles to prevent photo-oxidation and minimize single-use plastics. Our shipping mailers and box fillers are made of recycled kraft paper.</p>
+                    </div>
+                </details>
+
+                <details class="faq-item">
+                    <summary class="faq-question">
+                        <span>Where do you source your botanical ingredients?</span>
+                        <i class="fa-solid fa-chevron-down faq-chevron"></i>
+                    </summary>
+                    <div class="faq-answer">
+                        <p>We partner with local agricultural cooperatives and certified sustainable growers in the Philippines and Southeast Asia. Every botanical active is ethically harvested without endangering local ecosystems.</p>
+                    </div>
+                </details>
+            </div>
+        </section>
+
+        <!-- Need More Help Card -->
+        <div class="faq-contact-card">
+            <h3>Still have questions?</h3>
+            <p>Our botanical care specialists are here to guide you toward your ideal skincare ritual.</p>
+            <a href="https://www.facebook.com/owen.estrera1/" target="_blank" rel="noopener noreferrer" class="faq-contact-btn">
+                <i class="fa-brands fa-facebook"></i> Message Us on Facebook
+            </a>
+        </div>
+    </main>
+
+    <script>
+        // Automatically open the targeted FAQ section if navigating from a hash link
+        document.addEventListener('DOMContentLoaded', () => {
+            if (window.location.hash) {
+                const targetEl = document.querySelector(window.location.hash);
+                if (targetEl) {
+                    const firstItem = targetEl.querySelector('details');
+                    if (firstItem) {
+                        firstItem.open = true;
+                    }
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }
+        });
+    </script>
+{% endblock %}

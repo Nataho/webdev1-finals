@@ -1,7 +1,6 @@
 <section class="account-panel">
     <div class="panel-header-row">
         <div>
-            {# <h2><?= $user->is_admin() ? 'Store Activity & Order Logs' : 'My Order History' ?></h2> #}
             <h2>
                 {% if is_granted("ROLE_ADMIN") %}
                     Store Activity
@@ -14,9 +13,6 @@
                 {% else %}
                     Track your recent purchases and delivery details.
                 {% endif %}
-                {# <?= $user->is_admin() 
-                    ? 'Review customer orders, transaction dates, and fulfillment status.' 
-                    : 'Track your recent purchases and delivery details.' ?> #}
             </p>
         </div>
     </div>
@@ -30,10 +26,6 @@
                     {% if is_granted("ROLE_ADMIN") %}
                     <th>Customer</th>
                     {% endif %}
-                    
-                    {# <?php if ($user->is_admin()): ?>
-                        <th>Customer</th>
-                    <?php endif; ?> #}
                     <th>Date & Time</th>
                     <th>Total Amount</th>
                     <th>Status</th>

@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Hello AccountController!{% endblock %}
+{% block title %}My Account | Estrera Botanicals{% endblock %}
 {% block body_class %}account-page{% endblock %}
 
 {% block javascripts %}
@@ -23,53 +23,45 @@
         </button>
     </div>
 
-    {# FIXME #}
-    {# <?php if ($message): ?>
+    {% set success_flashes = app.flashes('success') %}
+    {% set error_flashes = app.flashes('error') %}
+
+    {% for message in success_flashes %}
         <div class="account-alert ok">
             <i class="fa-solid fa-circle-check"></i>
-            <span><?= htmlspecialchars($message) ?></span>
+            <span>{{ message }}</span>
         </div>
-    <?php endif; ?>
+    {% endfor %}
 
-    <?php if ($error): ?>
+    {% for message in error_flashes %}
         <div class="account-alert err">
             <i class="fa-solid fa-triangle-exclamation"></i>
-            <span><?= htmlspecialchars($error) ?></span>
+            <span>{{ message }}</span>
         </div>
-    <?php endif; ?> #}
+    {% endfor %}
 
     <div class="account-grid">
         <!-- Sidebar / Profile Card & Left Tabs -->
         <aside class="profile-card">
 
             <div class="profile-avatar-container">
-            {# {% if avatar_url %} #}
-            {% if avatar_url %}
-                <img src="<?= htmlspecialchars($avatar_url) ?>" alt="Profile Picture" class="profile-avatar">
-            {% else %}
-                <div class="profile-avatar-placeholder">
-                    <i class="fa-solid fa-user"></i>
-                </div>
-            {% endif %}
-                {# <?php if ($avatar_url): ?>
-                    <img src="<?= htmlspecialchars($avatar_url) ?>" alt="Profile Picture" class="profile-avatar">
-                <?php else: ?>
+                {% if avatar_file %}
+                    <img src="{{ asset('uploads/avatars/' ~ avatar_file) }}" alt="Profile Picture" class="profile-avatar">
+                {% else %}
                     <div class="profile-avatar-placeholder">
                         <i class="fa-solid fa-user"></i>
                     </div>
-                <?php endif; ?> #}
+                {% endif %}
             </div>
 
-            {# <h3><?= htmlspecialchars($user->name ?? 'User') ?></h3> #}
-            <h3>{{ user.username }}</h3>
-            {# <p class="user-email"><?= htmlspecialchars($user->email ?? '') ?></p> #}
-            <p class="user-email">{{ user.email }}</p>
-            {# <span class="profile-badge"><?= htmlspecialchars($user->role ?? 'Customer') ?></span> #}
-            <span class="profile-badge">{{ user.role }}</span>
+            <h3>{{ user.username ?? 'User' }}</h3>
+            <p class="user-email">{{ user.email ?? '' }}</p>
+            <span class="profile-badge">{{ user.role ?? 'Customer' }}</span>
 
             <!-- Avatar Change Form -->
             <form class="avatar-upload-form" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="update_avatar">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_avatar') }}">
                 <label for="avatar_input" class="avatar-upload-label" title="Click to select a new profile photo">
                     <i class="fa-solid fa-camera"></i> Change Photo
                 </label>
@@ -78,45 +70,28 @@
 
             <!-- Left Navigation Tabs -->
             <nav class="account-nav-tabs">
-                <a href="?tab=general" class="account-nav-tab <?= $active_tab === 'general' ? 'active' : '' ?>">
+                <a href="?tab=general" class="account-nav-tab {{ active_tab == 'general' ? 'active' : '' }}">
                     <i class="fa-solid fa-user-gear"></i> General & Security
                 </a>
-                <a href="?tab=logs" class="account-nav-tab <?= $active_tab === 'logs' ? 'active' : '' ?>">
-                    {# <i class="fa-solid fa-clock-rotate-left"></i> <?= $user->is_admin() ? 'Store Logs & Orders' : 'My Orders' ?> #}
+                <a href="?tab=logs" class="account-nav-tab {{ active_tab == 'logs' ? 'active' : '' }}">
                     <i class="fa-solid fa-clock-rotate-left"></i> {% if is_granted("ROLE_ADMIN") %} Store Logs & Orders {% else %} My Orders {% endif %}
                 </a>
 
                 {% if is_granted("ROLE_ADMIN") %}
                     <div class="nav-group-title">Admin Controls</div>
-                    <a href="?tab=dashboard" class="account-nav-tab <?= $active_tab === 'dashboard' ? 'active' : '' ?>">
+                    <a href="?tab=dashboard" class="account-nav-tab {{ active_tab == 'dashboard' ? 'active' : '' }}">
                         <i class="fa-solid fa-chart-line"></i> Dashboard
                     </a>
-                    <a href="?tab=users" class="account-nav-tab <?= $active_tab === 'users' ? 'active' : '' ?>">
+                    <a href="?tab=users" class="account-nav-tab {{ active_tab == 'users' ? 'active' : '' }}">
                         <i class="fa-solid fa-users"></i> Manage Users
                     </a>
-                    <a href="?tab=stock" class="account-nav-tab <?= $active_tab === 'stock' ? 'active' : '' ?>">
+                    <a href="?tab=stock" class="account-nav-tab {{ active_tab == 'stock' ? 'active' : '' }}">
                         <i class="fa-solid fa-boxes-stacked"></i> Stock & Inventory
                     </a>
-                    <a href="?tab=add_product" class="account-nav-tab <?= $active_tab === 'add_product' ? 'active' : '' ?>">
+                    <a href="?tab=add_product" class="account-nav-tab {{ active_tab == 'add_product' ? 'active' : '' }}">
                         <i class="fa-solid fa-plus-circle"></i> Add New Product
                     </a>
                 {% endif %}
-                
-                {# <?php if ($user->is_admin()): ?>
-                    <div class="nav-group-title">Admin Controls</div>
-                    <a href="?tab=dashboard" class="account-nav-tab <?= $active_tab === 'dashboard' ? 'active' : '' ?>">
-                        <i class="fa-solid fa-chart-line"></i> Dashboard
-                    </a>
-                    <a href="?tab=users" class="account-nav-tab <?= $active_tab === 'users' ? 'active' : '' ?>">
-                        <i class="fa-solid fa-users"></i> Manage Users
-                    </a>
-                    <a href="?tab=stock" class="account-nav-tab <?= $active_tab === 'stock' ? 'active' : '' ?>">
-                        <i class="fa-solid fa-boxes-stacked"></i> Stock & Inventory
-                    </a>
-                    <a href="?tab=add_product" class="account-nav-tab <?= $active_tab === 'add_product' ? 'active' : '' ?>">
-                        <i class="fa-solid fa-plus-circle"></i> Add New Product
-                    </a>
-                <?php endif; ?> #}
             </nav>
         </aside>
 
@@ -124,76 +99,86 @@
         <div class="account-panels">
             {% if active_tab == "dashboard" %}
                 {% include "partials/account_tabs/dashboard.html.twig" %}
-                
+
             {% elseif active_tab == "logs" %}
                 {% include "partials/account_tabs/logs.html.twig" %}
 
             {% elseif active_tab == "users" %}
                 {% include "partials/account_tabs/users.html.twig" %}
-            
+
             {% elseif active_tab == "stock" %}
                 {% include "partials/account_tabs/stock.html.twig" %}
 
             {% elseif active_tab == "add_product" %}
                 {% include "partials/account_tabs/add_product.html.twig" %}
-            
+
             {% else %}
                 {% include "partials/account_tabs/general.html.twig" %}
 
             {% endif %}
-            
-            {# <?php 
-            // load the active component tab
-            switch ($active_tab) {
-                case 'dashboard':
-                    if ($user->is_admin()) {
-                        require __DIR__ . '/tabs/dashboard.php';
-                    }
-                    break;
-                case 'logs':
-                    require __DIR__ . '/tabs/logs.php';
-                    break;
-                case 'users':
-                    if ($user->is_admin()) {
-                        require __DIR__ . '/tabs/users.php';
-                    }
-                    break;
-                case 'stock':
-                    if ($user->is_admin()) {
-                        require __DIR__ . '/tabs/stock.php';
-                    }
-                    break;
-                case 'add_product':
-                    if ($user->is_admin()) {
-                        require __DIR__ . '/tabs/add_product.php';
-                    }
-                    break;
-                case 'general':
-                default:
-                    require __DIR__ . '/tabs/general.php';
-                    break;
-            }
-            ?> #}
         </div>
     </div>
 </main>
 
 <!-- Modals -->
-<?php 
-$logoutModal->render();
-if ($deleteModal) {
-    $deleteModal->render();
-}
-if ($deleteProductModal) {
-    $deleteProductModal->render();
-}
-if ($alertModal) {
-    $alertModal->render();
-}
-?>
+{% include 'partials/modals/confirm.html.twig' with {
+    id: 'logoutModal',
+    message: 'Are you sure you want to log out?',
+    confirm_label: 'Log Out',
+    cancel_label: 'Cancel',
+    confirm_class: 'secondary',
+    action_url: path('app_logout'),
+    method: 'POST',
+    hidden: {},
+} %}
 
-<?php require ROOT_DIR . 'components/modal_scripts.php'; ?>
+{% if not is_granted('ROLE_ADMIN') %}
+    {% include 'partials/modals/confirm_type.html.twig' with {
+        id: 'deleteModal',
+        message: 'Are you sure you want to permanently delete your account?',
+        word: delete_account_word,
+        confirm_label: 'Delete My Account',
+        cancel_label: 'Cancel',
+        action_url: path('app_account'),
+        method: 'POST',
+        hidden: { action: 'delete_account' },
+        csrf_token_id: 'delete_account',
+    } %}
+{% endif %}
 
+{% if is_granted('ROLE_ADMIN') %}
+    {% include 'partials/modals/confirm_type.html.twig' with {
+        id: 'deleteProductModal',
+        message: 'Are you sure you want to permanently delete this product? This cannot be undone.',
+        word: 'DELETE_PLANT_PRODUCT',
+        confirm_label: 'Delete Product',
+        cancel_label: 'Cancel',
+        action_url: path('app_account'),
+        method: 'POST',
+        hidden: { action: 'delete_product', product_id: '' },
+        csrf_token_id: 'delete_product',
+    } %}
+{% endif %}
+
+{% set alert_type = success_flashes ? 'success' : 'error' %}
+{% set alert_message = success_flashes ? success_flashes|last : (error_flashes ? error_flashes|last : null) %}
+{% if alert_message %}
+    {% include 'partials/modals/alert.html.twig' with {
+        id: 'accountAlertModal',
+        message: alert_message,
+        type: alert_type,
+        button_label: alert_type == 'success' ? 'Continue' : 'Okay',
+    } %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            AlertModal.open('accountAlertModal');
+        });
+    </script>
+{% endif %}
+
+{% include 'partials/modals/scripts.html.twig' %}
+
+{% if is_granted('ROLE_ADMIN') %}
 <script>
     // set the product_id in the delete product modal before opening it
     function prepareDeleteProduct(productId) {
@@ -201,12 +186,5 @@ if ($alertModal) {
         ConfirmTypeModal.open('deleteProductModal');
     }
 </script>
-
-<?php if ($alertModal): ?>
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        AlertModal.open('accountAlertModal');
-    });
-</script>
-<?php endif; ?>
+{% endif %}
 {% endblock %}

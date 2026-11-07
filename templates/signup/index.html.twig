@@ -1,20 +1,84 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Hello SignupController!{% endblock %}
+{% block title %}Sign Up - Join Estrera Botanicals{% endblock %}
+
+{% block body_class %}auth-page{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/auth.css') }}">
+{% endblock %}
+
+{# field errors rendered inside the same alert styling the old site used #}
+{% macro auth_alert_errors(field) %}
+    {% if field.vars.errors is not empty %}
+        <div class="auth-alert-error">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span>
+                {% for error in field.vars.errors %}
+                    {{ error.message }}
+                    {% if not loop.last %}<br>{% endif %}
+                {% endfor %}
+            </span>
+        </div>
+    {% endif %}
+{% endmacro %}
 
 {% block body %}
-<style>
-    .example-wrapper { margin: 1em auto; max-width: 800px; width: 95%; font: 18px/1.5 sans-serif; }
-    .example-wrapper code { background: #F5F5F5; padding: 2px 6px; }
-</style>
+<main class="auth-page-container">
+    <div class="auth-card">
+        <div class="auth-header">
+            <span class="brand-badge">Join Estrera Botanicals</span>
+            <h1>Create Account</h1>
+            <p>Experience clean, botanical body care formulated for real results</p>
+        </div>
 
-<div class="example-wrapper">
-    <h1>Hello {{ controller_name }}! ✅</h1>
+        {{ form_start(signup_form, {'attr': {'class': 'auth-form'}}) }}
 
-    This friendly message is coming from:
-    <ul>
-        <li>Your controller at <code>C:/Users/Nataho/Documents/school/webdev/symfony/finals/src/Controller/SignupController.php</code></li>
-        <li>Your template at <code>C:/Users/Nataho/Documents/school/webdev/symfony/finals/templates/signup/index.html.twig</code></li>
-    </ul>
-</div>
+        <div class="auth-form-group">
+            {{ form_label(signup_form.username) }}
+            <div class="auth-input-wrapper">
+                <i class="fa-solid fa-user auth-input-icon"></i>
+                {{ form_widget(signup_form.username) }}
+            </div>
+            {{ _self.auth_alert_errors(signup_form.username) }}
+        </div>
+
+        <div class="auth-form-group">
+            {{ form_label(signup_form.email) }}
+            <div class="auth-input-wrapper">
+                <i class="fa-solid fa-envelope auth-input-icon"></i>
+                {{ form_widget(signup_form.email) }}
+            </div>
+            {{ _self.auth_alert_errors(signup_form.email) }}
+        </div>
+
+        <div class="auth-form-group">
+            {{ form_label(signup_form.password.first) }}
+            <div class="auth-input-wrapper">
+                <i class="fa-solid fa-lock auth-input-icon"></i>
+                {{ form_widget(signup_form.password.first) }}
+            </div>
+            {{ _self.auth_alert_errors(signup_form.password.first) }}
+        </div>
+
+        <div class="auth-form-group">
+            {{ form_label(signup_form.password.second) }}
+            <div class="auth-input-wrapper">
+                <i class="fa-solid fa-shield-halved auth-input-icon"></i>
+                {{ form_widget(signup_form.password.second) }}
+            </div>
+            {{ _self.auth_alert_errors(signup_form.password) }}
+        </div>
+
+        <button type="submit" class="auth-btn-submit">Register Account</button>
+
+        {{ form_end(signup_form) }}
+
+        <div class="auth-footer-nav">
+            Already have an account?
+            <a href="{{ path('app_login') }}">Sign in</a>
+        </div>
+    </div>
+</main>
 {% endblock %}

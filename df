@@ -1,0 +1,31 @@
+[33mcommit c773a41d48911f3e77c638468e743db4f5093814[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mtests[m[33m)[m
+Author: Nataho <153593932+Nataho@users.noreply.github.com>
+Date:   Sat Nov 7 15:10:42 2026 +0800
+
+    migrated from old database to docker
+    
+    all tables have correct columns now
+
+[33mcommit d893c827143720cbf40983e4f1f39d23f20e82f4[m
+Author: Nataho <153593932+Nataho@users.noreply.github.com>
+Date:   Tue Nov 3 09:30:12 2026 +0800
+
+    convert everything from php to twig
+
+[33mcommit 03fe0ce32a652200c92aa5352f191948f4dc37a4[m[33m ([m[1;32mmaster[m[33m)[m
+Author: Nataho <153593932+Nataho@users.noreply.github.com>
+Date:   Wed Oct 21 16:53:55 2026 +0800
+
+    first save of project
+
+[33mcommit 47bee233d3b105e6eddec1dcde7ed8d241625076[m
+Author: nataho <hashimotonataho@gmail.com>
+Date:   Tue Oct 6 01:25:03 2026 +0800
+
+    Add webapp packages
+
+[33mcommit 22ef5fa11c97c10c124bfd10d3c5c30faa4c9bbb[m
+Author: nataho <hashimotonataho@gmail.com>
+Date:   Tue Oct 6 01:23:27 2026 +0800
+
+    Add initial set of files

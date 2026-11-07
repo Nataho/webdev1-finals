@@ -1,0 +1,62 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{% if type == 'signup' %}Account Created!{% else %}Signed In Successfully{% endif %} | Estrera Botanicals{% endblock %}
+
+{% block body_class %}auth-page{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <link rel="stylesheet" href="{{ asset('styles/auth.css') }}">
+{% endblock %}
+
+{% block body %}
+<main class="auth-page-container">
+    <div class="auth-card" style="text-align: center;">
+        <div class="auth-success-icon">
+            <i class="fa-solid fa-check"></i>
+        </div>
+
+        <div class="auth-header" style="margin-bottom: 20px;">
+            {% if type == 'signup' %}
+                <span class="brand-badge">Welcome to Estrera Botanicals</span>
+                <h1>Account Created!</h1>
+                <p>Welcome, <strong>{{ app.user.username }}</strong>! Your account has been registered successfully.</p>
+            {% elseif is_granted('ROLE_ADMIN') %}
+                <span class="brand-badge">Signed In Successfully</span>
+                <h1>Admin Dashboard Ready!</h1>
+                <p>Welcome back, <strong>{{ app.user.username }}</strong>! Ready to review today's botanical orders and manage the shop inventory?</p>
+            {% else %}
+                <span class="brand-badge">Signed In Successfully</span>
+                <h1>Welcome Back!</h1>
+                <p>Hello, <strong>{{ app.user.username }}</strong>! You have successfully signed in to your account.</p>
+            {% endif %}
+        </div>
+
+        <div class="auth-success-actions">
+            <a href="{{ path('app_shop') }}" class="auth-btn-submit" style="display: block; text-decoration: none; text-align: center;">
+                Continue to Shop
+            </a>
+            <a href="{{ path('app_home') }}" class="auth-btn-secondary">
+                Go to Homepage
+            </a>
+        </div>
+
+        <p class="auth-redirect-notice">
+            Automatically continuing in <span id="countdown" style="font-weight: 700; color: var(--palette-dark-green);">10</span>s...
+        </p>
+    </div>
+</main>
+
+<script>
+    let timeLeft = 10;
+    const countdownEl = document.getElementById('countdown');
+    const timer = setInterval(() => {
+        timeLeft--;
+        if (countdownEl) countdownEl.textContent = timeLeft;
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            window.location.href = '{{ path('app_shop') }}';
+        }
+    }, 1000);
+</script>
+{% endblock %}

@@ -8,6 +8,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'users')]
@@ -21,9 +22,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     #[ORM\Column(name: 'user_name', length: 255)]
+    #[Assert\NotBlank(message: 'Please choose a username.')]
+    #[Assert\Length(min: 3, max: 255, minMessage: 'Username must be at least 3 characters long.')]
     private ?string $username = null;
 
     #[ORM\Column(name: 'user_email', length: 180)]
+    #[Assert\NotBlank(message: 'Please enter your email address.')]
+    #[Assert\Email(message: 'Please enter a valid email address.')]
+    #[Assert\Length(max: 180, maxMessage: 'Email address is too long.')]
     private ?string $email = null;
 
     #[ORM\Column(name: 'user_role', length: 50)]

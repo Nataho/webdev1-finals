@@ -96,6 +96,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    // check if this account has been restricted yet
+    public function isBanned(): bool
+    {
+        return $this->role === 'banned';
+    }
+
     public function getProfilePic(): ?string
     {
         return $this->profilePic;

@@ -1,0 +1,67 @@
+/* ==========================================================================
+   ABOUT US - SPECIFIC OVERRIDES & EXTENSIONS
+   ========================================================================== */
+
+/* Hero text adjustments for the about us banner */
+.about-us-image-container .overlay-content.center h1 {
+    font-size: 2.8rem;
+    color: var(--palette-dirty-white);
+}
+
+.about-us-image-container .overlay-content.center p {
+    max-width: 55ch;
+    color: #1e3321;
+    font-size: 1.15rem;
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   MISSION SECTION
+   ========================================================================== */
+#mission-section {
+    text-align: center;
+    padding: 40px 0;
+}
+
+#mission-section .section-heading {
+    text-align: center;
+    font-size: 2.2rem;
+    margin-bottom: 20px;
+}
+
+#mission-description {
+    font-size: 1.15rem;
+    line-height: 1.75;
+    text-align: center;
+    font-family: var(--document-font);
+    max-width: 680px;
+    margin: 0 auto;
+    color: var(--palette-gray);
+    text-wrap: balance;
+}
+
+/* ==========================================================================
+   FOUNDER CARD OVERRIDES
+   Base layout is inherited from .spotlight-section / .profile-section in app.css.
+   Here we wrap it in a custom About Us card and override specific tokens if desired.
+   ========================================================================== */
+.founder-card-wrapper {
+    background-color: var(--palette-white);
+    border-radius: 20px;
+    padding: 48px;
+    border: 1px solid rgba(131, 162, 126, 0.18);
+    box-shadow: 0 12px 35px rgba(43, 80, 46, 0.06);
+    max-width: 960px;
+    margin: 0 auto;
+    --photo-size: 260px;
+}
+
+@media (max-width: 768px) {
+    .founder-card-wrapper {
+        padding: 30px 20px;
+    }
+
+    #mission-description {
+        font-size: 1.05rem;
+    }
+}

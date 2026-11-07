@@ -4,7 +4,8 @@
 
     <form class="account-form" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="action" value="add_product">
-        
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('add_product') }}">
+
         <div class="account-field">
             <label for="product_name">Product Name *</label>
             <input type="text" id="product_name" name="product_name" placeholder="e.g. Lavender Herbal Toner" required>
@@ -30,7 +31,7 @@
             <label for="product_image">Product Image (Optional)</label>
             <input type="file" id="product_image" name="product_image" accept="image/*">
             <small style="font-size: 0.8rem; color: var(--palette-gray); margin-top: 4px; display: block;">
-                Accepts JPG, PNG, GIF, WEBP up to 5MB. Uploads directly to <code>eb-uploads</code>.
+                Accepts JPG, PNG, GIF, WEBP up to 5MB. The photo is stored in the shop's uploads folder and shown on its product card.
             </small>
         </div>
 

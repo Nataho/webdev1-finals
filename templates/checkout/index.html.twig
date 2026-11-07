@@ -1,0 +1,163 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Checkout | Estrera Botanicals{% endblock %}
+{% block body_class %}account-page{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+
+    <link rel="stylesheet" href="{{ asset('styles/account.css') }}">
+{% endblock %}
+
+{% block body %}
+<link rel="stylesheet" href="{{ asset('styles/checkout.css') }}">
+
+<main class="checkout-container">
+    <div class="account-header-bar">
+        <div>
+            <h1>Checkout & Review</h1>
+            <p style="margin: 4px 0 0 0; color: var(--palette-gray); font-size: 0.95rem;">
+                Review your botanical items, update quantities, and confirm your order.
+            </p>
+        </div>
+        <a href="{{ path('app_shop') }}" class="account-btn outline">
+            <i class="fa-solid fa-arrow-left"></i> Continue Shopping
+        </a>
+    </div>
+
+    {# the old page showed inline ok/err strips; the app pattern is PRG — messages arrive as a flash in the alert modal #}
+
+    {% if cart_items is empty %}
+        <div class="checkout-panel empty-cart-view">
+            <i class="fa-solid fa-cart-arrow-down" style="font-size: 3.5rem; color: #cbd5e1; margin-bottom: 16px; display: block;"></i>
+            <h2 style="border: none; justify-content: center; font-size: 1.6rem;">Your cart is currently empty</h2>
+            <p style="margin-bottom: 24px;">Explore our catalog to add nutrient-dense botanicals to your cart.</p>
+            <a href="{{ path('app_shop') }}" class="account-btn primary" style="text-decoration: none; display: inline-flex; padding: 12px 24px;">
+                <i class="fa-solid fa-bag-shopping"></i> Browse Botanical Shop
+            </a>
+        </div>
+    {% else %}
+        <div class="checkout-grid">
+            <!-- Cart Items List -->
+            <div class="checkout-panel">
+                <h2>
+                    <i class="fa-solid fa-basket-shopping"></i>
+                    Items in Your Cart ({{ cart_items|length }})
+                </h2>
+
+                <div class="cart-items-list">
+                    {% for item in cart_items %}
+                        <div class="cart-item-row">
+                            {% set cart_img = item.image_url|default(false) ? asset(item.image_url) : asset('images/3.png') %}
+                            <img src="{{ cart_img }}" alt="{{ item.name }}" class="cart-item-thumb">
+
+                            <div class="cart-item-meta">
+                                <h4>{{ item.name }}</h4>
+                                <div class="unit-price">₱{{ item.price|number_format(2) }} each</div>
+                            </div>
+
+                            <div class="cart-item-actions">
+                                <!-- quantity update form -->
+                                <form method="POST" action="{{ path('app_checkout') }}" style="display: inline-flex; align-items: center; gap: 6px;">
+                                    <input type="hidden" name="action" value="update_qty">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_qty') }}">
+                                    <input type="hidden" name="product_id" value="{{ item.id }}">
+                                    <div class="checkout-stepper">
+                                        <button type="submit" name="quantity" value="{{ max(0, item.qty - 1) }}" title="Decrease">
+                                            <i class="fa-solid fa-minus"></i>
+                                        </button>
+                                        <input type="text" readonly value="{{ item.qty }}">
+                                        <button type="submit" name="quantity" value="{{ min(item.stock, item.qty + 1) }}" title="Increase" {{ item.qty >= item.stock ? 'disabled style="opacity:0.4;"' : '' }}>
+                                            <i class="fa-solid fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <div class="cart-item-line-total">
+                                    ₱{{ item.line_total|number_format(2) }}
+                                </div>
+
+                                <!-- remove item button -->
+                                <form method="POST" action="{{ path('app_checkout') }}" style="margin: 0;">
+                                    <input type="hidden" name="action" value="remove_item">
+                                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('remove_item') }}">
+                                    <input type="hidden" name="product_id" value="{{ item.id }}">
+                                    <button type="submit" class="btn-remove-item" title="Remove Item">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Order Summary & Checkout Action -->
+            <aside class="order-summary-card">
+                <h3>Order Summary</h3>
+
+                <div class="summary-row">
+                    <span>Items Subtotal:</span>
+                    <strong>₱{{ subtotal|number_format(2) }}</strong>
+                </div>
+
+                <div class="summary-row">
+                    <span>Standard Shipping:</span>
+                    <strong style="color: var(--palette-light-green);">FREE</strong>
+                </div>
+
+                <div class="summary-row">
+                    <span>Tax &amp; Fees:</span>
+                    <span>₱0.00</span>
+                </div>
+
+                <div class="summary-row total">
+                    <span>Grand Total:</span>
+                    <span>₱{{ subtotal|number_format(2) }}</span>
+                </div>
+
+                <button type="button" class="btn-place-order" onclick="ConfirmModal.open('placeOrderModal')">
+                    <i class="fa-solid fa-circle-check"></i> Place Order Now
+                </button>
+
+                <div style="margin-top: 18px; font-size: 0.8rem; color: var(--palette-gray); text-align: center; font-family: var(--document-font);">
+                    <i class="fa-solid fa-shield-halved"></i> Secure botanical transaction
+                </div>
+            </aside>
+        </div>
+    {% endif %}
+</main>
+
+<!-- Confirm the order (submits place_order with the CSRF token) -->
+{% include 'partials/modals/confirm.html.twig' with {
+    id: 'placeOrderModal',
+    message: 'Are you sure you want to place this botanical order for ₱' ~ subtotal|number_format(2) ~ '?',
+    confirm_label: 'Confirm & Place Order',
+    cancel_label: 'Review Cart',
+    action_url: path('app_checkout'),
+    method: 'POST',
+    hidden: { action: 'place_order', _csrf_token: csrf_token('place_order') },
+    confirm_class: 'primary',
+} %}
+
+<!-- Checkout notification modal (success/error flash after a redirect) -->
+{% set success_flashes = app.flashes('success') %}
+{% set error_flashes = app.flashes('error') %}
+{% set alert_type = success_flashes ? 'success' : 'error' %}
+{% set alert_message = success_flashes ? success_flashes|last : (error_flashes ? error_flashes|last : null) %}
+{% if alert_message %}
+    {% include 'partials/modals/alert.html.twig' with {
+        id: 'checkoutAlertModal',
+        message: alert_message,
+        type: alert_type,
+        button_label: alert_type == 'success' ? 'Continue' : 'Okay',
+    } %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            AlertModal.open('checkoutAlertModal');
+        });
+    </script>
+{% endif %}
+
+{% include 'partials/modals/scripts.html.twig' %}
+{% endblock %}

@@ -17,15 +17,15 @@
             </p>
         </div>
 
-        <!-- Checkout button (disabled until the checkout page is built — the cart stays in the session) -->
-        <button type="button" class="shop-checkout-btn" disabled title="Checkout arrives in the next step — your cart is kept.">
+        <!-- Checkout button (the cart lives in the session until the order is placed) -->
+        <a href="{{ path('app_checkout') }}" class="shop-checkout-btn">
             <i class="fa-solid fa-cart-shopping"></i> Checkout
             {% if cart_count > 0 %}
                 <span style="background: var(--palette-light-green); color: #fff; padding: 2px 8px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;">
                     {{ cart_count }}
                 </span>
             {% endif %}
-        </button>
+        </a>
     </div>
 
     <!-- Filter Tabs: All Products & Best Sellers -->

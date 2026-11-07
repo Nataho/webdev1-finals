@@ -1,0 +1,123 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Order #{{ '%05d'|format(order.order_id) }} Summary | Estrera Botanicals{% endblock %}
+{% block body_class %}account-page{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+
+    <link rel="stylesheet" href="{{ asset('styles/account.css') }}">
+{% endblock %}
+
+{% block body %}
+<link rel="stylesheet" href="{{ asset('styles/checkout.css') }}">
+
+{# status badges mirror the old site's pending / active / banned coloring #}
+{% set status = (order.status|default('pending'))|lower %}
+{% set status_class = status in ['completed', 'delivered'] ? 'badge-status active' : (status in ['cancelled', 'declined'] ? 'badge-status banned' : 'badge-status pending') %}
+
+<main class="summary-container">
+    <div class="summary-card">
+        {% if just_placed %}
+            <div class="summary-banner">
+                <i class="fa-solid fa-circle-check"></i>
+                <div>
+                    <h3>Thank You! Order Placed Successfully</h3>
+                    <p>Your botanical order has been registered and inventory has been reserved.</p>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="panel-header-row" style="margin-bottom: 24px;">
+            <div>
+                <h2 style="font-family: var(--heading-font); color: var(--palette-dark-green); font-size: 1.8rem; margin: 0 0 6px 0;">
+                    Order #{{ '%05d'|format(order.order_id) }}
+                </h2>
+                <p class="subtext" style="margin: 0;">Official purchase record &amp; checkout summary</p>
+            </div>
+            <span class="{{ status_class }}" style="font-size: 0.95rem; padding: 6px 14px;">
+                <i class="fa-solid fa-circle-notch"></i> {{ (order.status|default('Pending'))|capitalize }}
+            </span>
+        </div>
+
+        <!-- Order Metadata Grid -->
+        <div class="order-meta-grid">
+            <div class="order-meta-item">
+                <label>Order Date</label>
+                <span>{{ order.order_date ? order.order_date|date('M d, Y · h:i A') : '' }}</span>
+            </div>
+            <div class="order-meta-item">
+                <label>Customer Name</label>
+                <span>{{ order.user_name|default('User') }}</span>
+            </div>
+            <div class="order-meta-item">
+                <label>Customer Email</label>
+                <span style="font-size: 0.9rem; font-weight: 500;">{{ order.user_email|default('N/A') }}</span>
+            </div>
+            <div class="order-meta-item">
+                <label>Viewing As</label>
+                <span style="color: var(--palette-light-green);">{{ is_admin ? 'Administrator' : 'Customer' }}</span>
+            </div>
+        </div>
+
+        <!-- Items Purchased Table -->
+        <div class="table-responsive">
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Botanical Product</th>
+                        <th style="text-align: center;">Price</th>
+                        <th style="text-align: center;">Qty</th>
+                        <th style="text-align: right;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        {% set row_img = item.image_url|default(false) ? asset(item.image_url) : asset('images/3.png') %}
+                        <tr>
+                            <td>
+                                <img src="{{ row_img }}" alt="" class="summary-table-thumb">
+                                <strong>{{ item.product_name|default('Product #' ~ item.product_id) }}</strong>
+                            </td>
+                            <td style="text-align: center;">₱{{ item.price_at_purchase|number_format(2) }}</td>
+                            <td style="text-align: center; font-weight: 700;">{{ item.quantity }}</td>
+                            <td style="text-align: right; font-weight: 700;">₱{{ (item.price_at_purchase * item.quantity)|number_format(2) }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Summary Totals -->
+        <div class="summary-totals-box">
+            <div class="summary-totals-row">
+                <span>Subtotal:</span>
+                <strong>₱{{ order.total_amount|number_format(2) }}</strong>
+            </div>
+            <div class="summary-totals-row">
+                <span>Shipping:</span>
+                <strong style="color: var(--palette-light-green);">FREE</strong>
+            </div>
+            <div class="summary-totals-row grand">
+                <span>Grand Total:</span>
+                <span>₱{{ order.total_amount|number_format(2) }}</span>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="summary-footer-actions">
+            <div style="display: flex; gap: 10px;">
+                <a href="{{ path('app_account', {tab: 'logs'}) }}" class="account-btn secondary" style="text-decoration: none;">
+                    <i class="fa-solid fa-clock-rotate-left"></i> View Order Logs
+                </a>
+                <a href="{{ path('app_shop') }}" class="account-btn outline" style="text-decoration: none;">
+                    <i class="fa-solid fa-arrow-left"></i> Return to Shop
+                </a>
+            </div>
+            <button type="button" class="account-btn outline" onclick="window.print()">
+                <i class="fa-solid fa-print"></i> Print Invoice
+            </button>
+        </div>
+    </div>
+</main>
+{% endblock %}

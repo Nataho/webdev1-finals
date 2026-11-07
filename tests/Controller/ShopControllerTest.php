@@ -72,9 +72,9 @@ final class ShopControllerTest extends WebTestCase
         $crawler = $client->request('GET', '/shop');
         self::assertResponseIsSuccessful();
 
-        // page header + checkout disabled (checkout page arrives in the next phase)
+        // page header + checkout now links to the review page (checkout page built in the checkout phase)
         self::assertSelectorTextContains('.shop-page-title h1', 'Botanical Shop');
-        self::assertSelectorExists('.shop-checkout-btn[disabled]');
+        self::assertSelectorExists('a.shop-checkout-btn[href="/checkout"]');
         self::assertSelectorNotExists('.account-alert.err');
 
         // three purchasable cards get the modal hook, the empty one does not

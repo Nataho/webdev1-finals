@@ -1,20 +1,74 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Hello AboutUsController!{% endblock %}
+{% block title %}About Us | Estrera Botanicals{% endblock %}
+{% block body_class %}about-us-page{% endblock %}
+
+{% block stylesheets %}
+{{ parent() }}
+<link rel="stylesheet" href="{{ asset('styles/about.css') }}">
+{% endblock %}
 
 {% block body %}
-<style>
-    .example-wrapper { margin: 1em auto; max-width: 800px; width: 95%; font: 18px/1.5 sans-serif; }
-    .example-wrapper code { background: #F5F5F5; padding: 2px 6px; }
-</style>
+    {#
+    <?php
+    require_once '../config.php';
+    ?>
+    #}
 
-<div class="example-wrapper">
-    <h1>Hello {{ controller_name }}! ✅</h1>
+    <!-- an "AHA!" moment here. always loved oop -->
+    <!-- header -->
+    {# <?php require ROOT_DIR . 'components/header.php' ?> #}
 
-    This friendly message is coming from:
-    <ul>
-        <li>Your controller at <code>C:/Users/Nataho/Documents/school/webdev/symfony/finals/src/Controller/AboutUsController.php</code></li>
-        <li>Your template at <code>C:/Users/Nataho/Documents/school/webdev/symfony/finals/templates/about_us/index.html.twig</code></li>
-    </ul>
-</div>
+    <!-- hero -->
+    <section class="about-us-image-container">
+        <img src="{{ asset('images/aboutus1.jpeg') }}" alt="aboutus1">
+
+        <div class="palette-overlay light-green blur"></div>
+
+        <div class="overlay-content center">
+            <h1>The Most Intelligent Skincare in the Philippines</h1>
+            <p>Truth is a commodity that we’ve been trading in since day one. We’re here to help you find your truth within your skincare routine. That’s true love. That’s true beauty. Applied daily.</p>
+        </div>
+    </section>
+
+    <!-- Mission -->
+    <section class="section-wrapper" id="mission-section">
+        <h1 class="section-heading">Mission</h1>
+        <p id="mission-description">Estrera Botanicals formulates clean, 100% plant-based
+            body care to heal and protect skin using organic
+            ingredients. Our mission is to eliminate synthetics, make
+            holistic wellness accessible, and promote sustainable beauty.</p>
+    </section>
+
+    <!-- idk if apilon ba ni lol -->
+    <!-- <section class="section-wrapper">
+        <h1>Headquarters</h1>
+        <p>Estrera Botanicals does not have a</p>
+    </section> -->
+
+    <!-- Founder / Spotlight Section -->
+    <section class="section-wrapper">
+        <div class="founder-card-wrapper">
+            <div class="spotlight-section">
+                <div class="spotlight-photo-container">
+                    <img class="spotlight-photo" src="{{ asset('images/owner.jpg') }}" alt="Owen Estrera - Founder">
+                </div>
+                <div class="spotlight-message">
+                    <span class="spotlight-badge">Founder's Note</span>
+                    <h1>Our Truth-Seeking Founder</h1>
+                    <blockquote class="spotlight-quote">
+                        "We founded Estrera Botanicals on a simple conviction: skincare should be genuinely honest, nourishing, and rooted in nature's purest botanicals. Every formulation is crafted to reveal your skin's truest, healthiest glow."
+                    </blockquote>
+                    <div class="spotlight-details">
+                        <p class="spotlight-name">Owen Estrera</p>
+                        <p class="spotlight-role">Founder & Chief Formulator</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- footer -->
+    {# <?php require ROOT_DIR . 'components/footer.php'?> #}
+    {% include 'partials/footer.html.twig' %}
 {% endblock %}

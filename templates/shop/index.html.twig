@@ -1,20 +1,218 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Hello ShopController!{% endblock %}
+{% block title %}Shop | Estrera Botanicals{% endblock %}
 
 {% block body %}
-<style>
-    .example-wrapper { margin: 1em auto; max-width: 800px; width: 95%; font: 18px/1.5 sans-serif; }
-    .example-wrapper code { background: #F5F5F5; padding: 2px 6px; }
-</style>
+<link rel="stylesheet" href="{{ asset('styles/shop.css') }}">
 
-<div class="example-wrapper">
-    <h1>Hello {{ controller_name }}! ✅</h1>
+<main class="section-wrapper">
+    <!-- Page Header & Checkout Trigger -->
+    <div class="shop-page-header">
+        <div class="shop-page-title">
+            <h1>{{ filter == 'best_sellers' ? 'Best Sellers' : 'Botanical Shop' }}</h1>
+            <p>
+                {{ filter == 'best_sellers'
+                    ? 'Our top-performing botanical formulas, loved and ordered most by our customers.'
+                    : 'Pure, nutrient-dense skincare formulated directly from raw plant botanicals.' }}
+            </p>
+        </div>
 
-    This friendly message is coming from:
-    <ul>
-        <li>Your controller at <code>C:/Users/Nataho/Documents/school/webdev/symfony/finals/src/Controller/ShopController.php</code></li>
-        <li>Your template at <code>C:/Users/Nataho/Documents/school/webdev/symfony/finals/templates/shop/index.html.twig</code></li>
-    </ul>
+        <!-- Checkout button (disabled until the checkout page is built — the cart stays in the session) -->
+        <button type="button" class="shop-checkout-btn" disabled title="Checkout arrives in the next step — your cart is kept.">
+            <i class="fa-solid fa-cart-shopping"></i> Checkout
+            {% if cart_count > 0 %}
+                <span style="background: var(--palette-light-green); color: #fff; padding: 2px 8px; border-radius: 20px; font-size: 0.8rem; font-weight: 700;">
+                    {{ cart_count }}
+                </span>
+            {% endif %}
+        </button>
+    </div>
+
+    <!-- Filter Tabs: All Products & Best Sellers -->
+    <div class="shop-filter-tabs">
+        <a href="{{ path('app_shop') }}" class="shop-tab-pill {{ filter == 'all' ? 'active' : '' }}">
+            <i class="fa-solid fa-leaf"></i> All Products
+        </a>
+        <a href="{{ path('app_shop', {filter: 'best_sellers'}) }}" class="shop-tab-pill {{ filter == 'best_sellers' ? 'active' : '' }}">
+            <i class="fa-solid fa-fire"></i> Best Sellers
+        </a>
+    </div>
+
+    {% if is_banned %}
+        <div class="account-alert err" style="margin-bottom: 24px;">
+            <i class="fa-solid fa-ban"></i>
+            <span>Your account is currently restricted. Purchasing and cart additions are disabled.</span>
+        </div>
+    {% endif %}
+
+    <!-- Products Catalog Grid (centered when best sellers) -->
+    {% if products is empty %}
+        <div style="text-align: center; padding: 60px 20px; color: var(--palette-gray); font-family: var(--document-font);">
+            <i class="fa-solid fa-seedling" style="font-size: 3rem; color: #cbd5e1; margin-bottom: 12px; display: block;"></i>
+            <h2>No products found</h2>
+            <p>Check back soon as we restock our botanical catalog.</p>
+        </div>
+    {% else %}
+        <div class="shop-grid {{ filter == 'best_sellers' ? 'centered-grid' : '' }}">
+            {% for product in products %}
+                {% include 'partials/shop/_product_card.html.twig' with { banned: is_banned } %}
+            {% endfor %}
+        </div>
+    {% endif %}
+</main>
+
+<!-- Add To Cart Quantity & Batch Total Modal -->
+<div id="addToCartModal" class="confirm-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="confirm-modal-box cart-batch-modal-box">
+        <div class="cart-modal-header">
+            <img id="cartModalProductImg" src="" alt="Product" class="cart-modal-thumb">
+            <div class="cart-modal-details">
+                <h3 id="cartModalProductName">Botanical Product</h3>
+                <div class="cart-modal-unit-price">Unit Price: <span id="cartModalUnitPrice">₱0.00</span></div>
+                <div class="cart-modal-stock-info">Available Stock: <span id="cartModalStock">0</span></div>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ path('app_shop') }}" id="addToCartForm" class="cart-modal-form">
+            <input type="hidden" name="action" value="add_to_cart">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('add_to_cart') }}">
+            <input type="hidden" name="product_id" id="cartModalProductId" value="0">
+
+            <div class="cart-modal-qty-control">
+                <label for="cartModalQty">Quantity to Add:</label>
+                <div class="qty-stepper-wrap">
+                    <button type="button" class="btn-qty-step" onclick="stepCartQty(-1)">
+                        <i class="fa-solid fa-minus"></i>
+                    </button>
+                    <input type="number"
+                           name="quantity"
+                           id="cartModalQty"
+                           value="1"
+                           min="1"
+                           max="1"
+                           required
+                           oninput="calculateCartBatchTotal()">
+                    <button type="button" class="btn-qty-step" onclick="stepCartQty(1)">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="cart-modal-summary-box">
+                <div class="summary-line">
+                    <span>Quantity:</span>
+                    <strong id="cartModalSummaryQty">1</strong>
+                </div>
+                <div class="summary-line total">
+                    <span>Batch Total:</span>
+                    <strong id="cartModalBatchTotal" class="batch-total-amount">₱0.00</strong>
+                </div>
+            </div>
+
+            <div class="confirm-modal-actions" style="margin-top: 20px;">
+                <button type="button" class="btn-modal-cancel" onclick="closeAddToCartModal()">
+                    Cancel
+                </button>
+                <button type="submit" class="btn-modal-confirm" id="btnConfirmAddToCart">
+                    <i class="fa-solid fa-bag-shopping"></i> Add to Cart
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
+
+<!-- Shop notification modal (success/error flash after a redirect) -->
+{% set success_flashes = app.flashes('success') %}
+{% set error_flashes = app.flashes('error') %}
+{% set alert_type = success_flashes ? 'success' : 'error' %}
+{% set alert_message = success_flashes ? success_flashes|last : (error_flashes ? error_flashes|last : null) %}
+{% if alert_message %}
+    {% include 'partials/modals/alert.html.twig' with {
+        id: 'shopAlertModal',
+        message: alert_message,
+        type: alert_type,
+        button_label: alert_type == 'success' ? 'Continue' : 'Okay',
+    } %}
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            AlertModal.open('shopAlertModal');
+        });
+    </script>
+{% endif %}
+
+<script>
+    let currentProductPrice = 0;
+    let currentProductStock = 0;
+
+    function openAddToCartModal(prod) {
+        currentProductPrice = parseFloat(prod.price) || 0;
+        currentProductStock = parseInt(prod.stock) || 0;
+
+        document.getElementById('cartModalProductId').value = prod.id;
+        document.getElementById('cartModalProductName').textContent = prod.name;
+        document.getElementById('cartModalProductImg').src = prod.image || '{{ asset("images/3.png") }}';
+        document.getElementById('cartModalUnitPrice').textContent = '₱' + currentProductPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        document.getElementById('cartModalStock').textContent = currentProductStock + ' units';
+
+        const qtyInput = document.getElementById('cartModalQty');
+        qtyInput.max = currentProductStock;
+        qtyInput.value = 1;
+
+        calculateCartBatchTotal();
+
+        const modal = document.getElementById('addToCartModal');
+        modal.style.display = 'flex';
+    }
+
+    function closeAddToCartModal() {
+        const modal = document.getElementById('addToCartModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    function stepCartQty(delta) {
+        const input = document.getElementById('cartModalQty');
+        let val = parseInt(input.value) || 1;
+        val += delta;
+        if (val < 1) val = 1;
+        if (val > currentProductStock) val = currentProductStock;
+        input.value = val;
+        calculateCartBatchTotal();
+    }
+
+    function calculateCartBatchTotal() {
+        const qtyInput = document.getElementById('cartModalQty');
+        let qty = parseInt(qtyInput.value) || 1;
+
+        if (qty < 1) {
+            qty = 1;
+            qtyInput.value = 1;
+        } else if (qty > currentProductStock) {
+            qty = currentProductStock;
+            qtyInput.value = currentProductStock;
+        }
+
+        const total = currentProductPrice * qty;
+        document.getElementById('cartModalSummaryQty').textContent = qty;
+        document.getElementById('cartModalBatchTotal').textContent = '₱' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // bind click listeners to all active product cards
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('[data-product-card="true"]').forEach(card => {
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', (e) => {
+                const prod = {
+                    id: card.dataset.id,
+                    name: card.dataset.name,
+                    price: card.dataset.price,
+                    stock: card.dataset.stock,
+                    image: card.dataset.image
+                };
+                openAddToCartModal(prod);
+            });
+        });
+    });
+</script>
+
+{% include 'partials/modals/scripts.html.twig' %}
 {% endblock %}

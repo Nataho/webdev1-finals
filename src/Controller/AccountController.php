@@ -715,16 +715,62 @@ final class AccountController extends AbstractController
             return $redirect(['tab' => 'logs']);
         }
 
-        $affected = $this->connection->executeStatement(
-            'UPDATE orders SET status = ? WHERE order_id = ?',
-            [$new_status, $order_id]
+        $order = $this->connection->fetchAssociative(
+            'SELECT status FROM orders WHERE order_id = ? LIMIT 1',
+            [$order_id]
         );
 
-        if ($affected > 0) {
-            $this->addFlash('success', "Order #{$order_id} status updated to '{$new_status}'.");
-        } else {
+        if (!$order) {
             $this->addFlash('error', 'Order not found; status not updated.');
+
+            return $redirect(['tab' => 'logs']);
         }
+
+        $previous_status = (string) $order['status'];
+
+        if ($previous_status === $new_status) {
+            $this->addFlash('error', 'This order already has that status.');
+
+            return $redirect(['tab' => 'logs']);
+        }
+
+        // status flip and the stock hand-back commit (or roll back) together
+        try {
+            $this->connection->beginTransaction();
+
+            $this->connection->executeStatement(
+                'UPDATE orders SET status = ? WHERE order_id = ?',
+                [$new_status, $order_id]
+            );
+
+            // cancelling returns the reserved items to the shelf, re-opening an
+            // already cancelled order takes them back out — atomically either way
+            $returning_to_cancelled = 'cancelled' === $new_status && 'cancelled' !== $previous_status;
+            $leaving_the_cancelled_bin = 'cancelled' !== $new_status && 'cancelled' === $previous_status;
+
+            if ($returning_to_cancelled) {
+                $stock_moved = $this->adjustStockForOrder($order_id, 'restock');
+            } elseif ($leaving_the_cancelled_bin) {
+                $stock_moved = $this->adjustStockForOrder($order_id, 'reserve');
+            } else {
+                $stock_moved = true;
+            }
+
+            if (!$stock_moved) {
+                $this->connection->rollBack();
+
+                return $redirect(['tab' => 'logs']);
+            }
+
+            $this->connection->commit();
+        } catch (\Throwable) {
+            $this->rollBackQuietly();
+            $this->addFlash('error', 'Something went wrong while updating this order. Please try again.');
+
+            return $redirect(['tab' => 'logs']);
+        }
+
+        $this->addFlash('success', "Order #{$order_id} status updated to '{$new_status}'.");
 
         return $redirect(['tab' => 'logs']);
     }
@@ -769,13 +815,87 @@ final class AccountController extends AbstractController
             return $redirect(['tab' => 'logs']);
         }
 
-        $this->connection->executeStatement(
-            "UPDATE orders SET status = 'cancelled', cancel_reason = ? WHERE order_id = ?",
-            [$cancel_reason, $order_id]
-        );
+        // the status flip and the stock hand-back commit (or roll back) together
+        try {
+            $this->connection->beginTransaction();
 
-        $this->addFlash('success', "Order #{$order_id} has been cancelled.");
+            $this->connection->executeStatement(
+                "UPDATE orders SET status = 'cancelled', cancel_reason = ? WHERE order_id = ?",
+                [$cancel_reason, $order_id]
+            );
+
+            if (!$this->adjustStockForOrder($order_id, 'restock')) {
+                $this->connection->rollBack();
+
+                return $redirect(['tab' => 'logs']);
+            }
+
+            $this->connection->commit();
+        } catch (\Throwable) {
+            $this->rollBackQuietly();
+            $this->addFlash('error', 'Something went wrong while cancelling this order. Please try again.');
+
+            return $redirect(['tab' => 'logs']);
+        }
+
+        $this->addFlash('success', "Order #{$order_id} has been cancelled and its items are back on the shelf.");
 
         return $redirect(['tab' => 'logs']);
+    }
+
+    /**
+     * Moves an order's reserved stock between the shelf and the reservation:
+     * 'restock' puts the items back (cancellation),
+     * 'reserve' takes them out again (admin re-opens a cancelled order).
+     * Legacy orders that predate the checkout transaction never reserved stock;
+     * a set payment method is the marker for that, so this skips them.
+     */
+    private function adjustStockForOrder(int $order_id, string $direction): bool
+    {
+        $direction = in_array($direction, ['restock', 'reserve'], true) ? $direction : 'restock';
+
+        // only checkout-placed orders have reservations to move around
+        $reserved_at_checkout = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM orders WHERE order_id = ? AND payment_method IS NOT NULL',
+            [$order_id]
+        );
+
+        if (0 === $reserved_at_checkout) {
+            return true;
+        }
+
+        // re-reserving must never push the shelf below zero (the guard checkout applies too)
+        if ('reserve' === $direction) {
+            $shortage = (int) $this->connection->fetchOne(
+                'SELECT COUNT(*) FROM order_items oi
+                 JOIN products p ON p.product_id = oi.product_id
+                 WHERE oi.order_id = ? AND p.product_stock_quantity < oi.quantity',
+                [$order_id]
+            );
+
+            if ($shortage > 0) {
+                $this->addFlash('error', 'Not enough stock on the shelf to move this order out of cancelled — some items have to be reserved again.');
+
+                return false;
+            }
+        }
+
+        $symbol = 'restock' === $direction ? '+' : '-';
+        $this->connection->executeStatement(
+            "UPDATE products p
+             JOIN order_items oi ON oi.product_id = p.product_id
+             SET p.product_stock_quantity = p.product_stock_quantity {$symbol} oi.quantity
+             WHERE oi.order_id = ?",
+            [$order_id]
+        );
+
+        return true;
+    }
+
+    private function rollBackQuietly(): void
+    {
+        if ($this->connection->isTransactionActive()) {
+            $this->connection->rollBack();
+        }
     }
 }

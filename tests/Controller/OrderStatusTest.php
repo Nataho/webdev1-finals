@@ -42,6 +42,8 @@ final class OrderStatusTest extends WebTestCase
              WHERE u.user_email IN ($placeholders)",
             self::ALL_TEST_EMAILS
         );
+        // sweep the fresh products we seeded (after the orders are gone, per the FK-free but tidy order)
+        $connection->executeStatement("DELETE FROM products WHERE product_name LIKE 'Status Test %'");
         $connection->executeStatement(
             "DELETE FROM users WHERE user_email IN ($placeholders)",
             self::ALL_TEST_EMAILS
@@ -329,7 +331,7 @@ final class OrderStatusTest extends WebTestCase
         self::assertResponseIsSuccessful();
 
         // flash confirms, the cancelled badge appears and the chips recount themselves
-        self::assertSelectorTextContains('.account-alert.ok', "Order #{$order_id} has been cancelled.");
+        self::assertSelectorTextContains('.account-alert.ok', "Order #{$order_id} has been cancelled and its items are back on the shelf.");
         self::assertSelectorTextSame('.badge-status.banned', 'Cancelled');
         self::assertSelectorTextContains('a.status-filter-chip[href$="status=cancelled"]', 'Cancelled (1)');
         self::assertSelectorTextContains('a.status-filter-chip[href$="status=pending"]', 'Pending (0)');
@@ -465,6 +467,123 @@ final class OrderStatusTest extends WebTestCase
         self::assertSame('wrong', $connection->fetchOne('SELECT cancel_reason FROM orders WHERE order_id = ?', [$order_id]));
     }
 
+    public function testCancellingTheOrderReturnsItsReservedStock(): void
+    {
+        $client = static::createClient();
+        $customer = $this->makeUser('customer', self::CUSTOMER_EMAIL);
+        $client->loginUser($customer);
+
+        $product_id = $this->createProduct('Status Test Canceller', '199.00', 7);
+        $order_id = $this->makeOrder($customer->getId(), 'pending', 'gcash', [
+            ['product_id' => $product_id, 'quantity' => 2, 'price_at_purchase' => '199.00'],
+        ]);
+
+        // seeding mirrored the checkout: 7 on the shelf, 2 being held by the order
+        $connection = static::getContainer()->get(Connection::class);
+        self::assertSame(5, (int) $connection->fetchOne('SELECT product_stock_quantity FROM products WHERE product_id = ?', [$product_id]));
+
+        $crawler = $client->request('GET', '/account?tab=logs');
+        $token = $crawler->filter('#cancelOrderModal input[name="_csrf_token"]')->attr('value');
+
+        $client->request('POST', '/account', [
+            'action' => 'cancel_order',
+            '_csrf_token' => $token,
+            'order_id' => (string) $order_id,
+            'cancel_reason' => 'moved to a different shop entirely.',
+        ]);
+
+        self::assertResponseRedirects('/account?tab=logs');
+        $client->followRedirect();
+        self::assertSelectorTextContains('.account-alert.ok', 'back on the shelf.');
+
+        // the shelf got everything back and the order is cancelled
+        self::assertSame(7, (int) $connection->fetchOne('SELECT product_stock_quantity FROM products WHERE product_id = ?', [$product_id]));
+        self::assertSame('cancelled', $connection->fetchOne('SELECT status FROM orders WHERE order_id = ?', [$order_id]));
+    }
+
+    public function testLegacyOrdersWithoutPaymentNeverReshuffleStock(): void
+    {
+        $client = static::createClient();
+        $customer = $this->makeUser('customer', self::CUSTOMER_EMAIL);
+        $client->loginUser($customer);
+
+        // a legacy row: items exist but stock never left the shelf (no payment method on file)
+        $product_id = $this->createProduct('Status Test Legacy', '99.00', 4);
+        $order_id = $this->makeOrder($customer->getId(), 'pending', null, [
+            ['product_id' => $product_id, 'quantity' => 2, 'price_at_purchase' => '99.00'],
+        ]);
+        $connection = static::getContainer()->get(Connection::class);
+        $connection->executeStatement('UPDATE products SET product_stock_quantity = 4 WHERE product_id = ?', [$product_id]);
+
+        $crawler = $client->request('GET', '/account?tab=logs');
+        $token = $crawler->filter('#cancelOrderModal input[name="_csrf_token"]')->attr('value');
+
+        $client->request('POST', '/account', [
+            'action' => 'cancel_order',
+            '_csrf_token' => $token,
+            'order_id' => (string) $order_id,
+            'cancel_reason' => 'no reason matters for legacy rows.',
+        ]);
+
+        self::assertResponseRedirects('/account?tab=logs');
+        $client->followRedirect();
+
+        // the shelf was NOT inflated by quantities that were never reserved
+        self::assertSame(4, (int) $connection->fetchOne('SELECT product_stock_quantity FROM products WHERE product_id = ?', [$product_id]));
+        self::assertSame('cancelled', $connection->fetchOne('SELECT status FROM orders WHERE order_id = ?', [$order_id]));
+    }
+
+    public function testAdminReopeningCancelledOrdersReReservesAndStallsOnShortage(): void
+    {
+        $client = static::createClient();
+        $customer = $this->makeUser('customer', self::CUSTOMER_EMAIL);
+        $client->loginUser($this->makeUser('admin', self::ADMIN_EMAIL));
+
+        $product_id = $this->createProduct('Status Test Reopener', '50.00', 9);
+
+        // two cancelled orders, both seeded to the post-restock state: shelf holds everything
+        $openable_id = $this->makeOrder($customer->getId(), 'cancelled', 'card', [
+            ['product_id' => $product_id, 'quantity' => 3, 'price_at_purchase' => '50.00'],
+        ]);
+        $stuck_id = $this->makeOrder($customer->getId(), 'cancelled', 'gcash', [
+            ['product_id' => $product_id, 'quantity' => 9, 'price_at_purchase' => '50.00'],
+        ]);
+        $connection = static::getContainer()->get(Connection::class);
+        $connection->executeStatement('UPDATE products SET product_stock_quantity = 9 WHERE product_id = ?', [$product_id]);
+
+        $crawler = $client->request('GET', '/account?tab=logs');
+        $token = $crawler->filter('form.status-update-form input[name="_csrf_token"]')->attr('value');
+
+        // re-opening the 3-item order takes its reservation back out of the shelf
+        $client->request('POST', '/account', [
+            'action' => 'update_order_status',
+            '_csrf_token' => $token,
+            'order_id' => (string) $openable_id,
+            'new_status' => 'preparing',
+        ]);
+        self::assertResponseRedirects('/account?tab=logs');
+        $client->followRedirect();
+        self::assertSame(6, (int) $connection->fetchOne('SELECT product_stock_quantity FROM products WHERE product_id = ?', [$product_id]));
+        self::assertSame('preparing', $connection->fetchOne('SELECT status FROM orders WHERE order_id = ?', [$openable_id]));
+
+        // the 9-item re-open cannot be covered by the 2 left on the shelf — refused wholesale
+        $connection->executeStatement('UPDATE products SET product_stock_quantity = 2 WHERE product_id = ?', [$product_id]);
+
+        $client->request('POST', '/account', [
+            'action' => 'update_order_status',
+            '_csrf_token' => $token,
+            'order_id' => (string) $stuck_id,
+            'new_status' => 'pending',
+        ]);
+        self::assertResponseRedirects('/account?tab=logs');
+        $client->followRedirect();
+        self::assertSelectorTextContains('.account-alert.err', 'Not enough stock on the shelf');
+
+        // no partial write: the order is still cancelled and the shelf still at 2
+        self::assertSame('cancelled', $connection->fetchOne('SELECT status FROM orders WHERE order_id = ?', [$stuck_id]));
+        self::assertSame(2, (int) $connection->fetchOne('SELECT product_stock_quantity FROM products WHERE product_id = ?', [$product_id]));
+    }
+
     // ---------- seeding helpers ----------
 
     private function makeUser(string $role, string $email): User
@@ -489,13 +608,37 @@ final class OrderStatusTest extends WebTestCase
         return $user;
     }
 
-    // fabricate an order straight into the database for link/status checks
-    private function makeOrder(int $user_id, string $status = 'pending'): int
+    // fabricate an order straight into the database for link/status checks;
+    // optional line items mirror the checkout reservation (each insert deducts the shelf)
+    private function makeOrder(int $user_id, string $status = 'pending', ?string $payment_method = null, array $items = []): int
     {
         $connection = static::getContainer()->get(Connection::class);
         $connection->executeStatement(
-            'INSERT INTO orders (user_id, total_amount, order_date, status) VALUES (?, ?, CURRENT_TIMESTAMP, ?)',
-            [$user_id, '299.00', $status]
+            'INSERT INTO orders (user_id, total_amount, order_date, status, payment_method) VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?)',
+            [$user_id, '299.00', $status, $payment_method]
+        );
+        $order_id = (int) $connection->lastInsertId();
+
+        foreach ($items as $item) {
+            $connection->executeStatement(
+                'INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)',
+                [$order_id, $item['product_id'], $item['quantity'], $item['price_at_purchase']]
+            );
+            $connection->executeStatement(
+                'UPDATE products SET product_stock_quantity = product_stock_quantity - ? WHERE product_id = ?',
+                [$item['quantity'], $item['product_id']]
+            );
+        }
+
+        return $order_id;
+    }
+
+    private function createProduct(string $name, string $price, int $stock): int
+    {
+        $connection = static::getContainer()->get(Connection::class);
+        $connection->executeStatement(
+            'INSERT INTO products (product_name, product_description, product_price, product_stock_quantity, product_img) VALUES (?, ?, ?, ?, ?)',
+            [$name, '', $price, $stock, '']
         );
 
         return (int) $connection->lastInsertId();

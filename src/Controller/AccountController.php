@@ -25,6 +25,12 @@ final class AccountController extends AbstractController
         'update_stock',
         'add_product',
         'delete_product',
+        'update_payment_options',
+        'remove_payment_option',
+        'add_address',
+        'edit_address',
+        'delete_address',
+        'set_default_address',
     ];
 
     public function __construct(
@@ -49,7 +55,7 @@ final class AccountController extends AbstractController
         }
 
         // determine active tab
-        $allowed_tabs = ['general', 'logs'];
+        $allowed_tabs = ['general', 'payment_options', 'addresses', 'logs'];
         if ($isAdmin) {
             $allowed_tabs = array_merge(['dashboard'], $allowed_tabs, ['users', 'stock', 'add_product']);
         }
@@ -65,6 +71,12 @@ final class AccountController extends AbstractController
         if ($this->fileUploader->exists('avatars', $user->getProfilePic())) {
             $avatar_file = $user->getProfilePic();
         }
+
+        // fetch user delivery addresses
+        $addresses = $this->connection->fetchAllAssociative(
+            'SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, address_id DESC',
+            [$user->getId()]
+        );
 
         // fetch data for the dashboard tab (admin only)
         $users_count = $products_count = $orders_count = 0;
@@ -137,6 +149,7 @@ final class AccountController extends AbstractController
             'allowed_tabs' => $allowed_tabs,
             'active_tab' => $active_tab,
             'orders_list' => $orders_list,
+            'addresses' => $addresses,
 
             'user_q' => $user_q,
             'admin_users_list' => $admin_users_list,
@@ -185,6 +198,12 @@ final class AccountController extends AbstractController
             'update_stock' => $isAdmin ? $this->updateStock($request, $redirect) : $redirect(),
             'add_product' => $isAdmin ? $this->addProduct($request, $user, $redirect) : $redirect(),
             'delete_product' => $isAdmin ? $this->deleteProduct($request, $redirect) : $redirect(),
+            'update_payment_options' => $this->updatePaymentOptions($request, $user, $redirect),
+            'remove_payment_option' => $this->removePaymentOption($request, $user, $redirect),
+            'add_address' => $this->addAddress($request, $user, $redirect),
+            'edit_address' => $this->editAddress($request, $user, $redirect),
+            'delete_address' => $this->deleteAddress($request, $user, $redirect),
+            'set_default_address' => $this->setDefaultAddress($request, $user, $redirect),
             default => null,
         };
     }
@@ -200,15 +219,21 @@ final class AccountController extends AbstractController
         }
 
         try {
-            $filename = $this->fileUploader->uploadImage($file);
+            $filename = $this->fileUploader->uploadImage($file, 'avatars');
         } catch (RuntimeException $e) {
             $this->addFlash('error', $e->getMessage());
 
             return $redirect();
         }
 
+        $old_pic = $user->getProfilePic();
         $user->setProfilePic($filename);
-        $this->entityManager->flush();
+        $this->connection->executeStatement('UPDATE users SET user_profile_pic = ? WHERE user_id = ?', [$filename, $user->getId()]);
+
+        if ($old_pic) {
+            $this->fileUploader->delete('avatars', $old_pic);
+        }
+
         $this->addFlash('success', 'Profile picture updated successfully!');
 
         return $redirect();
@@ -216,81 +241,126 @@ final class AccountController extends AbstractController
 
     private function changeUsername(Request $request, User $user, \Closure $redirect): Response
     {
-        $username = trim($request->getPayload()->getString('username'));
+        $new_username = trim($request->getPayload()->getString('new_username'));
 
-        if (mb_strlen($username) < 3) {
+        if (mb_strlen($new_username) < 3) {
             $this->addFlash('error', 'Username must be at least 3 characters long.');
-        } else {
-            $user->setUsername($username);
-            $this->entityManager->flush();
-            $this->addFlash('success', "Username updated to '".$username."'!");
+
+            return $redirect();
         }
+
+        if ($new_username === $user->getUsername()) {
+            $this->addFlash('error', 'New username cannot be the same as your current username.');
+
+            return $redirect();
+        }
+
+        $existing = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM users WHERE user_name = ? AND user_id != ?',
+            [$new_username, $user->getId()]
+        );
+        if ($existing > 0) {
+            $this->addFlash('error', 'That username is already taken. Please choose another.');
+
+            return $redirect();
+        }
+
+        $user->setUsername($new_username);
+        $this->connection->executeStatement('UPDATE users SET user_name = ? WHERE user_id = ?', [$new_username, $user->getId()]);
+        $this->addFlash('success', 'Username updated successfully!');
 
         return $redirect();
     }
 
     private function changePassword(Request $request, User $user, \Closure $redirect): Response
     {
-        $current_password = $request->getPayload()->getString('current_password');
-        $new_password = $request->getPayload()->getString('new_password');
-        $confirm_password = $request->getPayload()->getString('confirm_password');
+        $curr = $request->getPayload()->getString('curr_password');
+        $new = $request->getPayload()->getString('new_password');
+        $confirm = $request->getPayload()->getString('confirm_password');
 
-        if ($new_password !== $confirm_password) {
-            $this->addFlash('error', 'New passwords do not match.');
-        } elseif (!$this->passwordHasher->isPasswordValid($user, $current_password)) {
-            $this->addFlash('error', 'Current password is incorrect.');
-        } else {
-            $user->setPassword($this->passwordHasher->hashPassword($user, $new_password));
-            $this->entityManager->flush();
-            $this->addFlash('success', 'Password updated successfully!');
+        if (!$this->passwordHasher->isPasswordValid($user, $curr)) {
+            $this->addFlash('error', 'Incorrect current password.');
+
+            return $redirect();
         }
+
+        if (mb_strlen($new) < 6) {
+            $this->addFlash('error', 'New password must be at least 6 characters long.');
+
+            return $redirect();
+        }
+
+        if ($new !== $confirm) {
+            $this->addFlash('error', 'New passwords do not match.');
+
+            return $redirect();
+        }
+
+        $hashed = $this->passwordHasher->hashPassword($user, $new);
+        $user->setPassword($hashed);
+        $this->connection->executeStatement('UPDATE users SET user_password = ? WHERE user_id = ?', [$hashed, $user->getId()]);
+        $this->addFlash('success', 'Password updated successfully!');
 
         return $redirect();
     }
 
     private function deleteAccount(Request $request, User $user, \Closure $redirect): Response
     {
-        if ($this->isGranted('ROLE_ADMIN')) {
-            $this->addFlash('error', 'Admin accounts cannot be deleted.');
+        $typed = trim($request->getPayload()->getString('confirmation_input'));
+        $expected = 'DELETE_'.mb_strtoupper($user->getUsername());
+
+        if ($typed !== $expected) {
+            $this->addFlash('error', 'Account deletion cancelled: phrase did not match.');
 
             return $redirect();
         }
 
-        try {
-            $this->entityManager->remove($user);
-            $this->entityManager->flush();
-        } catch (\Throwable) {
-            $this->addFlash('error', 'Failed to delete account. Please try again.');
+        $old_pic = $user->getProfilePic();
+        $this->connection->executeStatement('DELETE FROM users WHERE user_id = ?', [$user->getId()]);
 
-            return $redirect();
+        if ($old_pic) {
+            $this->fileUploader->delete('avatars', $old_pic);
         }
 
-        // log the (now deleted) user out
-        $this->container->get('security.token_storage')->setToken(null);
-        $this->addFlash('success', 'Your account has been permanently deleted.');
+        $request->getSession()->invalidate();
 
-        return $this->redirectToRoute('app_signup');
+        return $this->redirectToRoute('app_logout');
     }
 
-    private function toggleUserBan(Request $request, User $user, \Closure $redirect): Response
+    private function toggleUserBan(Request $request, User $currentUser, \Closure $redirect): Response
     {
-        $targetUserId = $request->getPayload()->getInt('target_user_id');
-        $targetAction = $request->getPayload()->getString('target_action');
+        $target_id = $request->getPayload()->getInt('target_user_id');
 
-        if ($targetUserId === (int) $user->getId()) {
-            $this->addFlash('error', 'You cannot ban or unban your own account.');
+        if ($target_id <= 0 || $target_id === $currentUser->getId()) {
+            $this->addFlash('error', 'Invalid target user specified.');
 
             return $redirect(['tab' => 'users']);
         }
 
-        $newRole = ('unban' === $targetAction) ? 'customer' : 'banned';
-        $this->connection->executeStatement(
-            'UPDATE users SET user_role = ? WHERE user_id = ?',
-            [$newRole, $targetUserId]
+        $row = $this->connection->fetchAssociative(
+            'SELECT user_id, user_role FROM users WHERE user_id = ?',
+            [$target_id]
         );
 
-        $status_word = ('unban' === $targetAction) ? 'unbanned' : 'banned';
-        $this->addFlash('success', "User has been successfully {$status_word}.");
+        if (!$row) {
+            $this->addFlash('error', 'User not found.');
+
+            return $redirect(['tab' => 'users']);
+        }
+
+        if ('admin' === $row['user_role']) {
+            $this->addFlash('error', 'Administrators cannot be banned.');
+
+            return $redirect(['tab' => 'users']);
+        }
+
+        $new_role = ('banned' === $row['user_role']) ? 'customer' : 'banned';
+        $this->connection->executeStatement(
+            'UPDATE users SET user_role = ? WHERE user_id = ?',
+            [$new_role, $target_id]
+        );
+
+        $this->addFlash('success', 'banned' === $new_role ? 'User has been banned.' : 'User has been unbanned.');
 
         return $redirect(['tab' => 'users']);
     }
@@ -298,19 +368,19 @@ final class AccountController extends AbstractController
     private function updateStock(Request $request, \Closure $redirect): Response
     {
         $product_id = $request->getPayload()->getInt('product_id');
-        $new_qty = $request->getPayload()->getInt('stock_quantity');
+        $new_stock = $request->getPayload()->getInt('new_stock');
 
-        if ($product_id <= 0) {
-            $this->addFlash('error', 'Invalid product or quantity specified.');
+        if ($product_id <= 0 || $new_stock < 0) {
+            $this->addFlash('error', 'Invalid stock quantity entered.');
 
             return $redirect(['tab' => 'stock']);
         }
 
         $this->connection->executeStatement(
             'UPDATE products SET product_stock_quantity = ? WHERE product_id = ?',
-            [$new_qty, $product_id]
+            [$new_stock, $product_id]
         );
-        $this->addFlash('success', 'Stock quantity updated successfully!');
+        $this->addFlash('success', 'Stock level updated successfully!');
 
         return $redirect(['tab' => 'stock']);
     }
@@ -372,5 +442,222 @@ final class AccountController extends AbstractController
         }
 
         return $redirect(['tab' => 'stock']);
+    }
+
+    private function updatePaymentOptions(Request $request, User $user, \Closure $redirect): Response
+    {
+        $payment_type = $request->getPayload()->getString('payment_type');
+
+        if ($payment_type === 'gcash') {
+            $number = trim($request->getPayload()->getString('gcash_number'));
+            if ($number === '') {
+                $this->addFlash('error', 'Please enter a valid GCash mobile number.');
+
+                return $redirect(['tab' => 'payment_options']);
+            }
+            $user->setGcashNumber($number);
+            $this->connection->executeStatement('UPDATE users SET gcash_number = ? WHERE user_id = ?', [$number, $user->getId()]);
+            $this->addFlash('success', 'GCash account updated successfully.');
+        } elseif ($payment_type === 'card') {
+            $number = trim($request->getPayload()->getString('card_number'));
+            // strip spaces/dashes
+            $clean_number = preg_replace('/\D/', '', $number);
+            if (mb_strlen($clean_number) < 12) {
+                $this->addFlash('error', 'Please enter a valid card number (at least 12 digits).');
+
+                return $redirect(['tab' => 'payment_options']);
+            }
+            $user->setCardNumber($clean_number);
+            $this->connection->executeStatement('UPDATE users SET card_number = ? WHERE user_id = ?', [$clean_number, $user->getId()]);
+            $this->addFlash('success', 'Card details updated successfully.');
+        } else {
+            $this->addFlash('error', 'Invalid payment option type.');
+        }
+
+        return $redirect(['tab' => 'payment_options']);
+    }
+
+    private function removePaymentOption(Request $request, User $user, \Closure $redirect): Response
+    {
+        $payment_type = $request->getPayload()->getString('payment_type');
+
+        if ($payment_type === 'gcash') {
+            $user->setGcashNumber(null);
+            $this->connection->executeStatement('UPDATE users SET gcash_number = NULL WHERE user_id = ?', [$user->getId()]);
+            $this->addFlash('success', 'GCash account removed.');
+        } elseif ($payment_type === 'card') {
+            $user->setCardNumber(null);
+            $this->connection->executeStatement('UPDATE users SET card_number = NULL WHERE user_id = ?', [$user->getId()]);
+            $this->addFlash('success', 'Card details removed.');
+        }
+
+        return $redirect(['tab' => 'payment_options']);
+    }
+
+    private function addAddress(Request $request, User $user, \Closure $redirect): Response
+    {
+        $label = trim($request->getPayload()->getString('label', 'Home'));
+        $recipient_name = trim($request->getPayload()->getString('recipient_name'));
+        $phone_number = trim($request->getPayload()->getString('phone_number'));
+        $region = trim($request->getPayload()->getString('region'));
+        $province = trim($request->getPayload()->getString('province'));
+        $city = trim($request->getPayload()->getString('city'));
+        $barangay = trim($request->getPayload()->getString('barangay'));
+        $postal_code = trim($request->getPayload()->getString('postal_code'));
+        $street_address = trim($request->getPayload()->getString('street_address'));
+        $is_default = $request->getPayload()->getBoolean('is_default');
+
+        if ($recipient_name === '' || $phone_number === '' || $region === '' || $city === '' || $barangay === '' || $street_address === '') {
+            $this->addFlash('error', 'Please fill in all required address fields (Recipient, Phone, Region, City, Barangay, Street).');
+
+            return $redirect(['tab' => 'addresses']);
+        }
+
+        // if user has no addresses yet, make this one default
+        $count = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM user_addresses WHERE user_id = ?', [$user->getId()]);
+        if ($count === 0 || $is_default) {
+            $is_default = true;
+            $this->connection->executeStatement('UPDATE user_addresses SET is_default = 0 WHERE user_id = ?', [$user->getId()]);
+        }
+
+        $this->connection->executeStatement(
+            'INSERT INTO user_addresses (user_id, label, recipient_name, phone_number, region, province, city, barangay, postal_code, street_address, is_default)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                $user->getId(),
+                $label ?: 'Home',
+                $recipient_name,
+                $phone_number,
+                $region,
+                $province ?: null,
+                $city,
+                $barangay,
+                $postal_code ?: null,
+                $street_address,
+                $is_default ? 1 : 0,
+            ]
+        );
+
+        $this->addFlash('success', 'New delivery address added successfully.');
+
+        return $redirect(['tab' => 'addresses']);
+    }
+
+    private function editAddress(Request $request, User $user, \Closure $redirect): Response
+    {
+        $address_id = (int) $request->getPayload()->getString('address_id');
+        $label = trim($request->getPayload()->getString('label', 'Home'));
+        $recipient_name = trim($request->getPayload()->getString('recipient_name'));
+        $phone_number = trim($request->getPayload()->getString('phone_number'));
+        $region = trim($request->getPayload()->getString('region'));
+        $province = trim($request->getPayload()->getString('province'));
+        $city = trim($request->getPayload()->getString('city'));
+        $barangay = trim($request->getPayload()->getString('barangay'));
+        $postal_code = trim($request->getPayload()->getString('postal_code'));
+        $street_address = trim($request->getPayload()->getString('street_address'));
+        $is_default = $request->getPayload()->getBoolean('is_default');
+
+        $exists = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM user_addresses WHERE address_id = ? AND user_id = ?',
+            [$address_id, $user->getId()]
+        );
+
+        if (!$exists) {
+            $this->addFlash('error', 'Address not found or unauthorized.');
+
+            return $redirect(['tab' => 'addresses']);
+        }
+
+        if ($recipient_name === '' || $phone_number === '' || $region === '' || $city === '' || $barangay === '' || $street_address === '') {
+            $this->addFlash('error', 'Please fill in all required address fields.');
+
+            return $redirect(['tab' => 'addresses']);
+        }
+
+        if ($is_default) {
+            $this->connection->executeStatement('UPDATE user_addresses SET is_default = 0 WHERE user_id = ?', [$user->getId()]);
+        }
+
+        $this->connection->executeStatement(
+            'UPDATE user_addresses SET
+                label = ?, recipient_name = ?, phone_number = ?, region = ?,
+                province = ?, city = ?, barangay = ?, postal_code = ?,
+                street_address = ?, is_default = ?
+            WHERE address_id = ? AND user_id = ?',
+            [
+                $label ?: 'Home',
+                $recipient_name,
+                $phone_number,
+                $region,
+                $province ?: null,
+                $city,
+                $barangay,
+                $postal_code ?: null,
+                $street_address,
+                $is_default ? 1 : 0,
+                $address_id,
+                $user->getId(),
+            ]
+        );
+
+        $this->addFlash('success', 'Delivery address updated successfully.');
+
+        return $redirect(['tab' => 'addresses']);
+    }
+
+    private function deleteAddress(Request $request, User $user, \Closure $redirect): Response
+    {
+        $address_id = (int) $request->getPayload()->getString('address_id');
+
+        $is_default = (int) $this->connection->fetchOne(
+            'SELECT is_default FROM user_addresses WHERE address_id = ? AND user_id = ?',
+            [$address_id, $user->getId()]
+        );
+
+        $deleted = $this->connection->executeStatement(
+            'DELETE FROM user_addresses WHERE address_id = ? AND user_id = ?',
+            [$address_id, $user->getId()]
+        );
+
+        if ($deleted > 0) {
+            // if we deleted the default address, set another remaining address as default if one exists
+            if ($is_default) {
+                $other_id = $this->connection->fetchOne(
+                    'SELECT address_id FROM user_addresses WHERE user_id = ? ORDER BY address_id DESC LIMIT 1',
+                    [$user->getId()]
+                );
+                if ($other_id) {
+                    $this->connection->executeStatement(
+                        'UPDATE user_addresses SET is_default = 1 WHERE address_id = ?',
+                        [$other_id]
+                    );
+                }
+            }
+            $this->addFlash('success', 'Address deleted successfully.');
+        } else {
+            $this->addFlash('error', 'Failed to delete address.');
+        }
+
+        return $redirect(['tab' => 'addresses']);
+    }
+
+    private function setDefaultAddress(Request $request, User $user, \Closure $redirect): Response
+    {
+        $address_id = (int) $request->getPayload()->getString('address_id');
+
+        $exists = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM user_addresses WHERE address_id = ? AND user_id = ?',
+            [$address_id, $user->getId()]
+        );
+
+        if ($exists) {
+            $this->connection->executeStatement('UPDATE user_addresses SET is_default = 0 WHERE user_id = ?', [$user->getId()]);
+            $this->connection->executeStatement('UPDATE user_addresses SET is_default = 1 WHERE address_id = ? AND user_id = ?', [$address_id, $user->getId()]);
+            $this->addFlash('success', 'Default delivery address updated.');
+        } else {
+            $this->addFlash('error', 'Address not found.');
+        }
+
+        return $redirect(['tab' => 'addresses']);
     }
 }

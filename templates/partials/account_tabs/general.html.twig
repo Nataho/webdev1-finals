@@ -36,6 +36,32 @@
     </form>
 </section>
 
+<!-- Attached Payment Methods -->
+<section class="account-panel">
+    <h2>Attached Payment Methods</h2>
+    <p class="subtext">Your saved payment details used for express checkout.</p>
+    <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fbfdfb; border: 1px solid #e2e8e2; border-radius: 8px;">
+            <div>
+                <strong><i class="fa-solid fa-mobile-screen-button"></i> GCash Number:</strong>
+                <span style="margin-left: 8px; color: var(--palette-gray);">{{ app.user.gcashNumber ? app.user.gcashNumber : 'Not attached yet' }}</span>
+            </div>
+            {% if app.user.gcashNumber %}
+                <span class="badge-status active" style="font-size: 0.75rem; padding: 2px 8px;">Attached</span>
+            {% endif %}
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: #fbfdfb; border: 1px solid #e2e8e2; border-radius: 8px;">
+            <div>
+                <strong><i class="fa-solid fa-credit-card"></i> Card Number:</strong>
+                <span style="margin-left: 8px; color: var(--palette-gray);">{{ app.user.cardNumber ? ('•••• •••• •••• ' ~ app.user.cardNumber|slice(-4)) : 'Not attached yet' }}</span>
+            </div>
+            {% if app.user.cardNumber %}
+                <span class="badge-status active" style="font-size: 0.75rem; padding: 2px 8px;">Attached</span>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
 {% if not is_granted("ROLE_ADMIN") %}
 <!-- Danger Zone (Delete Account) -->
 <section class="account-panel danger-zone">

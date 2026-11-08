@@ -227,6 +227,198 @@
     font-family: var(--document-font);
 }
 
+/* Payment Methods Section */
+.checkout-payment-methods {
+    margin: 20px 0 16px 0;
+    padding-top: 16px;
+    border-top: 1px dashed #d8e2d7;
+}
+
+.checkout-payment-methods h4 {
+    font-family: var(--document-font);
+    font-size: 0.95rem;
+    color: var(--palette-dark-green);
+    margin: 0 0 10px 0;
+    font-weight: 700;
+}
+
+.payment-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.payment-method-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 1.5px solid #e2e8e2;
+    border-radius: 10px;
+    cursor: pointer;
+    background: #fff;
+    transition: all 0.2s ease;
+}
+
+.payment-method-card:hover {
+    border-color: var(--palette-light-green);
+    background: #fbfdfb;
+}
+
+.payment-method-card input[type="radio"] {
+    accent-color: var(--palette-dark-green);
+    cursor: pointer;
+}
+
+.payment-method-card.selected {
+    border-color: var(--palette-dark-green);
+    background: #f4f8f4;
+}
+
+.payment-method-details {
+    flex: 1;
+}
+
+.payment-method-label {
+    font-family: var(--document-font);
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--palette-dark-green);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.payment-method-subtext {
+    font-size: 0.78rem;
+    color: var(--palette-gray);
+    margin-top: 2px;
+}
+
+.attached-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #eaf3ea;
+    color: var(--palette-dark-green);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 12px;
+    margin-left: auto;
+}
+
+.payment-input-drawer {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #edf2ed;
+}
+
+.payment-input-drawer input {
+    width: 100%;
+    padding: 8px 12px;
+    font-family: var(--document-font);
+    font-size: 0.85rem;
+    border: 1.5px solid #d8e2d7;
+    border-radius: 6px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.payment-input-drawer input:focus {
+    border-color: var(--palette-light-green);
+}
+
+/* Delivery Address Section */
+.checkout-address-section {
+    margin: 20px 0 16px 0;
+    padding-top: 16px;
+    border-top: 1px dashed #d8e2d7;
+}
+
+.checkout-address-section h4 {
+    font-family: var(--document-font);
+    font-size: 0.95rem;
+    color: var(--palette-dark-green);
+    margin: 0 0 10px 0;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.checkout-address-card {
+    padding: 12px 14px;
+    background: #fbfdfb;
+    border: 1.5px solid #d8e2d7;
+    border-radius: 10px;
+    font-size: 0.88rem;
+    margin-bottom: 8px;
+}
+
+.checkout-address-card.selected {
+    border-color: var(--palette-dark-green);
+    background: #f4f8f4;
+}
+
+.checkout-address-card strong {
+    color: var(--palette-dark-green);
+    display: block;
+    margin-bottom: 2px;
+}
+
+.checkout-address-drawer {
+    margin-top: 8px;
+    padding: 10px;
+    background: #fbfdfb;
+    border: 1px solid #e2e8e2;
+    border-radius: 8px;
+}
+
+.checkout-address-drawer input,
+.checkout-address-drawer select {
+    width: 100%;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border: 1.5px solid #d8e2d7;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-family: var(--document-font);
+    box-sizing: border-box;
+}
+
+.btn-other-payment {
+    width: 100%;
+    margin-top: 10px;
+    padding: 9px 12px;
+    background: #f8faf8;
+    border: 1.5px dashed #a4bfa4;
+    border-radius: 8px;
+    font-family: var(--document-font);
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: var(--palette-dark-green);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-other-payment:hover {
+    background: #eaf3ea;
+    border-color: var(--palette-dark-green);
+}
+
+.other-payment-box {
+    margin-top: 10px;
+    padding: 12px;
+    background: #fcfdfc;
+    border: 1.5px solid #d8e2d7;
+    border-radius: 10px;
+}
+
 /* ==========================================================================
    ORDER INVOICE / SUMMARY PAGE (.summary-card)
    ========================================================================== */

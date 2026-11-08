@@ -273,6 +273,7 @@ final class CheckoutControllerTest extends WebTestCase
         $order = $connection->fetchAssociative('SELECT * FROM orders WHERE order_id = ?', [$order_id]);
         self::assertSame('1148.00', $order['total_amount']);
         self::assertSame('pending', $order['status']);
+        self::assertSame('cash_on_delivery', $order['payment_method']);
         self::assertSame($customer->getId(), (int) $order['user_id']);
 
         $items = $connection->fetchAllAssociative('SELECT * FROM order_items WHERE order_id = ? ORDER BY item_id', [$order_id]);
@@ -294,6 +295,177 @@ final class CheckoutControllerTest extends WebTestCase
         self::assertSelectorTextContains('.summary-totals-row.grand', '₱1,148.00');
         self::assertSelectorTextContains('.badge-status', 'Pending');
         self::assertSelectorTextContains('.order-meta-grid', 'Customer');
+        self::assertSelectorTextContains('.order-meta-grid', 'Cash on Delivery');
+    }
+
+    public function testPlaceOrderSupportsGcashPaymentMethod(): void
+    {
+        $client = static::createClient();
+        $customer = $this->makeUser('customer', self::CUSTOMER_EMAIL);
+        $client->loginUser($customer);
+
+        $serum_id = $this->createProduct('Shop Test Serum GCash', '499.00', 10, null);
+        $this->fillCartViaShop($client, [$serum_id => 1]);
+
+        $crawler = $client->request('GET', '/checkout');
+        $token = $crawler->filter('#placeOrderModal form input[name="_csrf_token"]')->attr('value');
+
+        $client->request('POST', '/checkout', [
+            'action' => 'place_order',
+            '_csrf_token' => $token,
+            'payment_method' => 'gcash',
+            'gcash_number' => '09171234567',
+        ]);
+
+        self::assertResponseRedirects();
+        $client->followRedirect();
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.order-meta-grid', 'GCash');
+
+        $order_id = $this->latestOrderIdForCustomer();
+        $connection = static::getContainer()->get(Connection::class);
+        $order = $connection->fetchAssociative('SELECT * FROM orders WHERE order_id = ?', [$order_id]);
+        self::assertSame('gcash', $order['payment_method']);
+
+        // Verify GCash number was attached to customer in database
+        $user_row = $connection->fetchAssociative('SELECT gcash_number FROM users WHERE user_id = ?', [$customer->getId()]);
+        self::assertSame('09171234567', $user_row['gcash_number']);
+    }
+
+    public function testPlaceOrderRequiresGcashNumberIfNotAttached(): void
+    {
+        $client = static::createClient();
+        $customer = $this->makeUser('customer', self::CUSTOMER_EMAIL);
+        $client->loginUser($customer);
+
+        $serum_id = $this->createProduct('Shop Test Serum GCash Validation', '499.00', 10, null);
+        $this->fillCartViaShop($client, [$serum_id => 1]);
+
+        $crawler = $client->request('GET', '/checkout');
+        $token = $crawler->filter('#placeOrderModal form input[name="_csrf_token"]')->attr('value');
+
+        $client->request('POST', '/checkout', [
+            'action' => 'place_order',
+            '_csrf_token' => $token,
+            'payment_method' => 'gcash',
+            'gcash_number' => '',
+        ]);
+
+        self::assertResponseRedirects('/checkout');
+        $client->followRedirect();
+        self::assertSelectorTextContains('#checkoutAlertModal .confirm-modal-message', 'Please enter your GCash mobile number to attach it to your account.');
+    }
+
+    public function testPlaceOrderSupportsCardPaymentMethod(): void
+    {
+        $client = static::createClient();
+        $customer = $this->makeUser('customer', self::CUSTOMER_EMAIL);
+        $client->loginUser($customer);
+
+        $serum_id = $this->createProduct('Shop Test Serum Card', '499.00', 10, null);
+        $this->fillCartViaShop($client, [$serum_id => 1]);
+
+        $crawler = $client->request('GET', '/checkout');
+        $token = $crawler->filter('#placeOrderModal form input[name="_csrf_token"]')->attr('value');
+
+        $client->request('POST', '/checkout', [
+            'action' => 'place_order',
+            '_csrf_token' => $token,
+            'payment_method' => 'card',
+            'card_number' => '1234567812345678',
+        ]);
+
+        self::assertResponseRedirects();
+        $client->followRedirect();
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.order-meta-grid', 'Credit / Debit Card');
+
+        $order_id = $this->latestOrderIdForCustomer();
+        $connection = static::getContainer()->get(Connection::class);
+        $order = $connection->fetchAssociative('SELECT * FROM orders WHERE order_id = ?', [$order_id]);
+        self::assertSame('card', $order['payment_method']);
+
+        // Verify card number was attached to customer in database
+        $user_row = $connection->fetchAssociative('SELECT card_number FROM users WHERE user_id = ?', [$customer->getId()]);
+        self::assertSame('1234567812345678', $user_row['card_number']);
+    }
+
+    public function testPlaceOrderRecordsDeliveryAddressAndDisplaysOnSummary(): void
+    {
+        $client = static::createClient();
+        $customer = $this->makeUser('customer', self::CUSTOMER_EMAIL);
+        $client->loginUser($customer);
+
+        $serum_id = $this->createProduct('Shop Test Serum Address', '499.00', 10, null);
+        $this->fillCartViaShop($client, [$serum_id => 1]);
+
+        $crawler = $client->request('GET', '/checkout');
+        $token = $crawler->filter('#placeOrderModal form input[name="_csrf_token"]')->attr('value');
+
+        $client->request('POST', '/checkout', [
+            'action' => 'place_order',
+            '_csrf_token' => $token,
+            'payment_method' => 'cash_on_delivery',
+            'street_address' => '123 Hibiscus Lane',
+            'barangay' => 'San Antonio',
+            'city' => 'Pasig City',
+            'region' => 'Metro Manila',
+            'recipient_name' => 'Clara Reyes',
+            'recipient_phone' => '09221234567',
+        ]);
+
+        self::assertResponseRedirects();
+        $client->followRedirect();
+        self::assertResponseIsSuccessful();
+
+        // Check delivery address display on summary
+        self::assertSelectorTextContains('.order-meta-grid', '123 Hibiscus Lane');
+        self::assertSelectorTextContains('.order-meta-grid', 'San Antonio');
+        self::assertSelectorTextContains('.order-meta-grid', 'Pasig City');
+        self::assertSelectorTextContains('.order-meta-grid', 'Clara Reyes');
+        self::assertSelectorTextContains('.order-meta-grid', '09221234567');
+
+        // Verify database columns
+        $order_id = $this->latestOrderIdForCustomer();
+        $connection = static::getContainer()->get(Connection::class);
+        $order = $connection->fetchAssociative('SELECT * FROM orders WHERE order_id = ?', [$order_id]);
+        self::assertStringContainsString('123 Hibiscus Lane', $order['delivery_address']);
+        self::assertSame('Clara Reyes', $order['recipient_name']);
+        self::assertSame('09221234567', $order['recipient_phone']);
+    }
+
+    public function testPlaceOrderViaOtherPaymentMethodsDisplaysDetailsOnSummary(): void
+    {
+        $client = static::createClient();
+        $customer = $this->makeUser('customer', self::CUSTOMER_EMAIL);
+        $client->loginUser($customer);
+
+        $serum_id = $this->createProduct('Shop Test Serum Payment Details', '499.00', 10, null);
+        $this->fillCartViaShop($client, [$serum_id => 1]);
+
+        $crawler = $client->request('GET', '/checkout');
+        $token = $crawler->filter('#placeOrderModal form input[name="_csrf_token"]')->attr('value');
+
+        $client->request('POST', '/checkout', [
+            'action' => 'place_order',
+            '_csrf_token' => $token,
+            'payment_method' => 'gcash',
+            'gcash_number' => '09998887777',
+        ]);
+
+        self::assertResponseRedirects();
+        $client->followRedirect();
+        self::assertResponseIsSuccessful();
+
+        // Verify payment method and payment option details on summary
+        self::assertSelectorTextContains('.order-meta-grid', 'GCash');
+        self::assertSelectorTextContains('.order-meta-grid', '09998887777');
+
+        $order_id = $this->latestOrderIdForCustomer();
+        $connection = static::getContainer()->get(Connection::class);
+        $order = $connection->fetchAssociative('SELECT * FROM orders WHERE order_id = ?', [$order_id]);
+        self::assertSame('gcash', $order['payment_method']);
+        self::assertSame('09998887777', $order['payment_details']);
     }
 
     public function testPlaceOrderRejectsInsufficientStock(): void
@@ -404,7 +576,8 @@ final class CheckoutControllerTest extends WebTestCase
         // the owner sees their own order as a plain customer
         $client->request('GET', '/checkout/summary?order_id=' . $order_id);
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('.order-meta-grid .order-meta-item:nth-child(4) span', 'Customer');
+        self::assertSelectorTextContains('.order-meta-grid .order-meta-item:nth-child(4) span', 'Cash on Delivery');
+        self::assertSelectorTextContains('.order-meta-grid .order-meta-item:nth-child(5) span', 'Customer');
 
         // a different customer gets bounced to the account page
         $client->loginUser($this->makeUser('customer', self::OUTSIDER_EMAIL));
@@ -416,7 +589,7 @@ final class CheckoutControllerTest extends WebTestCase
         $client->loginUser($admin);
         $client->request('GET', '/checkout/summary?order_id=' . $order_id);
         self::assertResponseIsSuccessful();
-        self::assertSelectorTextContains('.order-meta-grid .order-meta-item:nth-child(4) span', 'Administrator');
+        self::assertSelectorTextContains('.order-meta-grid .order-meta-item:nth-child(5) span', 'Administrator');
     }
 
     // ---------- seeding helpers ----------

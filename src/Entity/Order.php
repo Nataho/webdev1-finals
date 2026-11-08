@@ -36,6 +36,21 @@ class Order
     #[ORM\OneToMany(targetEntity: OrderItem::class, mappedBy: 'orderRef')]
     private Collection $orderItems;
 
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $paymentMethod = null;
+
+    #[ORM\Column(length: 100, nullable: true)]
+    private ?string $paymentDetails = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $deliveryAddress = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $recipientName = null;
+
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $recipientPhone = null;
+
     public function __construct()
     {
         $this->orderItems = new ArrayCollection();
@@ -120,6 +135,66 @@ class Order
                 $orderItem->setOrderRef(null);
             }
         }
+
+        return $this;
+    }
+
+    public function getPaymentMethod(): ?string
+    {
+        return $this->paymentMethod;
+    }
+
+    public function setPaymentMethod(?string $paymentMethod): static
+    {
+        $this->paymentMethod = $paymentMethod;
+
+        return $this;
+    }
+
+    public function getPaymentDetails(): ?string
+    {
+        return $this->paymentDetails;
+    }
+
+    public function setPaymentDetails(?string $paymentDetails): static
+    {
+        $this->paymentDetails = $paymentDetails;
+
+        return $this;
+    }
+
+    public function getDeliveryAddress(): ?string
+    {
+        return $this->deliveryAddress;
+    }
+
+    public function setDeliveryAddress(?string $deliveryAddress): static
+    {
+        $this->deliveryAddress = $deliveryAddress;
+
+        return $this;
+    }
+
+    public function getRecipientName(): ?string
+    {
+        return $this->recipientName;
+    }
+
+    public function setRecipientName(?string $recipientName): static
+    {
+        $this->recipientName = $recipientName;
+
+        return $this;
+    }
+
+    public function getRecipientPhone(): ?string
+    {
+        return $this->recipientPhone;
+    }
+
+    public function setRecipientPhone(?string $recipientPhone): static
+    {
+        $this->recipientPhone = $recipientPhone;
 
         return $this;
     }

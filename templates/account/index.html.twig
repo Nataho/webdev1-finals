@@ -73,6 +73,12 @@
                 <a href="?tab=general" class="account-nav-tab {{ active_tab == 'general' ? 'active' : '' }}">
                     <i class="fa-solid fa-user-gear"></i> General & Security
                 </a>
+                <a href="?tab=payment_options" class="account-nav-tab {{ active_tab == 'payment_options' ? 'active' : '' }}">
+                    <i class="fa-solid fa-wallet"></i> Payment Options
+                </a>
+                <a href="?tab=addresses" class="account-nav-tab {{ active_tab == 'addresses' ? 'active' : '' }}">
+                    <i class="fa-solid fa-location-dot"></i> Addresses
+                </a>
                 <a href="?tab=logs" class="account-nav-tab {{ active_tab == 'logs' ? 'active' : '' }}">
                     <i class="fa-solid fa-clock-rotate-left"></i> {% if is_granted("ROLE_ADMIN") %} Store Logs & Orders {% else %} My Orders {% endif %}
                 </a>
@@ -102,6 +108,12 @@
 
             {% elseif active_tab == "logs" %}
                 {% include "partials/account_tabs/logs.html.twig" %}
+
+            {% elseif active_tab == "payment_options" %}
+                {% include "partials/account_tabs/payment_options.html.twig" %}
+
+            {% elseif active_tab == "addresses" %}
+                {% include "partials/account_tabs/addresses.html.twig" %}
 
             {% elseif active_tab == "users" %}
                 {% include "partials/account_tabs/users.html.twig" %}

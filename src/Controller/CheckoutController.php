@@ -47,9 +47,16 @@ final class CheckoutController extends AbstractController
         // load all cart product details
         [$cart_items, $subtotal] = $this->loadCart($request->getSession());
 
+        // fetch user's saved addresses
+        $addresses = $this->connection->fetchAllAssociative(
+            'SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, address_id DESC',
+            [$user->getId()]
+        );
+
         return $this->render('checkout/index.html.twig', [
             'cart_items' => $cart_items,
             'subtotal' => $subtotal,
+            'addresses' => $addresses,
         ]);
     }
 
@@ -202,14 +209,155 @@ final class CheckoutController extends AbstractController
             return $this->redirectToRoute('app_checkout');
         }
 
+        // validate payment method
+        $payment_method = $request->getPayload()->getString('payment_method', 'cash_on_delivery');
+        $valid_methods = ['cash_on_delivery', 'gcash', 'card'];
+        if (!in_array($payment_method, $valid_methods, true)) {
+            $payment_method = 'cash_on_delivery';
+        }
+
+        $payment_details = null;
+        if ($payment_method === 'gcash') {
+            $submitted_gcash = trim($request->getPayload()->getString('gcash_number'));
+            $gcash_num = $submitted_gcash !== '' ? $submitted_gcash : trim($user->getGcashNumber() ?? '');
+            if ($gcash_num === '') {
+                $this->addFlash('error', 'Please enter your GCash mobile number to attach it to your account.');
+
+                return $this->redirectToRoute('app_checkout');
+            }
+            $payment_details = $gcash_num;
+            if ($user->getGcashNumber() !== $gcash_num || $request->getPayload()->getBoolean('save_payment_method')) {
+                $user->setGcashNumber($gcash_num);
+                $this->connection->executeStatement('UPDATE users SET gcash_number = ? WHERE user_id = ?', [$gcash_num, $user->getId()]);
+            }
+        } elseif ($payment_method === 'card') {
+            $submitted_card = trim($request->getPayload()->getString('card_number'));
+            $card_num = $submitted_card !== '' ? $submitted_card : trim($user->getCardNumber() ?? '');
+            if ($card_num === '') {
+                $this->addFlash('error', 'Please enter your card number to attach it to your account.');
+
+                return $this->redirectToRoute('app_checkout');
+            }
+            $clean_card = preg_replace('/\D/', '', $card_num);
+            $payment_details = '•••• •••• •••• ' . substr($clean_card, -4);
+            if ($user->getCardNumber() !== $clean_card || $request->getPayload()->getBoolean('save_payment_method')) {
+                $user->setCardNumber($clean_card);
+                $this->connection->executeStatement('UPDATE users SET card_number = ? WHERE user_id = ?', [$clean_card, $user->getId()]);
+            }
+        } else {
+            $payment_details = 'Cash on Delivery';
+        }
+
+        // resolve delivery address
+        $raw_address_id = $request->getPayload()->getString('selected_address_id');
+        $address_id = is_numeric($raw_address_id) ? (int) $raw_address_id : 0;
+        $delivery_address = null;
+        $recipient_name = trim($request->getPayload()->getString('recipient_name'));
+        $recipient_phone = trim($request->getPayload()->getString('recipient_phone'));
+
+        if ($address_id > 0) {
+            $saved_addr = $this->connection->fetchAssociative(
+                'SELECT * FROM user_addresses WHERE address_id = ? AND user_id = ?',
+                [$address_id, $user->getId()]
+            );
+            if ($saved_addr) {
+                $recipient_name = $saved_addr['recipient_name'];
+                $recipient_phone = $saved_addr['phone_number'];
+                $delivery_parts = array_filter([
+                    $saved_addr['street_address'],
+                    $saved_addr['barangay'] ? 'Brgy. ' . $saved_addr['barangay'] : null,
+                    $saved_addr['city'],
+                    $saved_addr['province'] && $saved_addr['province'] !== $saved_addr['city'] ? $saved_addr['province'] : null,
+                    $saved_addr['region'],
+                    $saved_addr['postal_code'],
+                ]);
+                $delivery_address = implode(', ', $delivery_parts);
+            }
+        }
+
+        // if not picked from saved address, check individual address inputs
+        if (!$delivery_address) {
+            $street = trim($request->getPayload()->getString('street_address'));
+            $barangay = trim($request->getPayload()->getString('barangay'));
+            $city = trim($request->getPayload()->getString('city'));
+            $region = trim($request->getPayload()->getString('region'));
+            $province = trim($request->getPayload()->getString('province'));
+            $postal_code = trim($request->getPayload()->getString('postal_code'));
+
+            if ($street !== '' || $city !== '' || $region !== '') {
+                $delivery_parts = array_filter([
+                    $street,
+                    $barangay ? 'Brgy. ' . $barangay : null,
+                    $city,
+                    $province && $province !== $city ? $province : null,
+                    $region,
+                    $postal_code,
+                ]);
+                $delivery_address = implode(', ', $delivery_parts);
+
+                // optionally save to user_addresses
+                if ($request->getPayload()->getBoolean('save_address')) {
+                    $has_default = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM user_addresses WHERE user_id = ?', [$user->getId()]);
+                    $this->connection->executeStatement(
+                        'INSERT INTO user_addresses (user_id, label, recipient_name, phone_number, region, province, city, barangay, postal_code, street_address, is_default)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [
+                            $user->getId(),
+                            'Home',
+                            $recipient_name ?: $user->getUsername(),
+                            $recipient_phone ?: 'N/A',
+                            $region ?: 'Metro Manila',
+                            $province ?: null,
+                            $city ?: 'Manila',
+                            $barangay ?: 'Central',
+                            $postal_code ?: null,
+                            $street ?: 'Address',
+                            $has_default === 0 ? 1 : 0,
+                        ]
+                    );
+                }
+            } else {
+                // fall back to user's default saved address if available
+                $default_addr = $this->connection->fetchAssociative(
+                    'SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, address_id DESC LIMIT 1',
+                    [$user->getId()]
+                );
+                if ($default_addr) {
+                    $recipient_name = $default_addr['recipient_name'];
+                    $recipient_phone = $default_addr['phone_number'];
+                    $delivery_parts = array_filter([
+                        $default_addr['street_address'],
+                        $default_addr['barangay'] ? 'Brgy. ' . $default_addr['barangay'] : null,
+                        $default_addr['city'],
+                        $default_addr['province'] && $default_addr['province'] !== $default_addr['city'] ? $default_addr['province'] : null,
+                        $default_addr['region'],
+                        $default_addr['postal_code'],
+                    ]);
+                    $delivery_address = implode(', ', $delivery_parts);
+                }
+            }
+        }
+
+        if (!$recipient_name) {
+            $recipient_name = $user->getUsername();
+        }
+
         // start database transaction
         try {
             $this->connection->beginTransaction();
 
             // insert order
             $this->connection->executeStatement(
-                "INSERT INTO orders (user_id, total_amount, order_date, status) VALUES (?, ?, NOW(), 'pending')",
-                [$user->getId(), number_format($total_amount, 2, '.', '')]
+                "INSERT INTO orders (user_id, total_amount, order_date, status, payment_method, payment_details, delivery_address, recipient_name, recipient_phone) VALUES (?, ?, NOW(), 'pending', ?, ?, ?, ?, ?)",
+                [
+                    $user->getId(),
+                    number_format($total_amount, 2, '.', ''),
+                    $payment_method,
+                    $payment_details,
+                    $delivery_address,
+                    $recipient_name,
+                    $recipient_phone,
+                ]
             );
             $order_id = (int) $this->connection->lastInsertId();
 

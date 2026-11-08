@@ -55,8 +55,40 @@
                 <span style="font-size: 0.9rem; font-weight: 500;">{{ order.user_email|default('N/A') }}</span>
             </div>
             <div class="order-meta-item">
+                <label>Payment Method</label>
+                <span>
+                    {% if order.payment_method == 'gcash' %}
+                        <i class="fa-solid fa-mobile-screen-button"></i> GCash
+                        {% set gcash_detail = (order.payment_details is defined and order.payment_details) ? order.payment_details : (order.gcash_number is defined and order.gcash_number ? order.gcash_number : (app.user.gcashNumber|default(''))) %}
+                        {% if gcash_detail %}
+                            <span style="font-weight: 500; color: #406040; margin-left: 4px;">({{ gcash_detail }})</span>
+                        {% endif %}
+                    {% elseif order.payment_method == 'card' %}
+                        <i class="fa-solid fa-credit-card"></i> Credit / Debit Card
+                        {% set card_detail = (order.payment_details is defined and order.payment_details) ? order.payment_details : (order.card_number is defined and order.card_number ? order.card_number : (app.user.cardNumber|default('') ? '•••• •••• •••• ' ~ app.user.cardNumber|slice(-4) : '')) %}
+                        {% if card_detail %}
+                            <span style="font-weight: 500; color: #406040; margin-left: 4px;">({{ card_detail }})</span>
+                        {% endif %}
+                    {% else %}
+                        <i class="fa-solid fa-hand-holding-dollar"></i> Cash on Delivery
+                    {% endif %}
+                </span>
+            </div>
+            <div class="order-meta-item">
                 <label>Viewing As</label>
                 <span style="color: var(--palette-light-green);">{{ is_admin ? 'Administrator' : 'Customer' }}</span>
+            </div>
+            <div class="order-meta-item" style="grid-column: 1 / -1; border-top: 1px dashed #d8e2d7; padding-top: 10px; margin-top: 2px;">
+                <label><i class="fa-solid fa-location-dot" style="color: var(--palette-light-green);"></i> Delivery Address</label>
+                <span style="font-weight: 500; color: #2d3748;">
+                    {{ (order.delivery_address is defined and order.delivery_address) ? order.delivery_address : 'Standard Delivery Destination' }}
+                    {% if (order.recipient_name is defined and order.recipient_name) or (order.recipient_phone is defined and order.recipient_phone) %}
+                        <span style="display: block; font-size: 0.85rem; color: var(--palette-gray); margin-top: 2px;">
+                            Recipient: <strong>{{ order.recipient_name is defined and order.recipient_name ? order.recipient_name : order.user_name|default('User') }}</strong>
+                            {% if order.recipient_phone is defined and order.recipient_phone %} · {{ order.recipient_phone }}{% endif %}
+                        </span>
+                    {% endif %}
+                </span>
             </div>
         </div>
 

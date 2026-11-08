@@ -1,0 +1,105 @@
+<!-- GCash Account Panel -->
+<section class="account-panel">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <div>
+            <h2><i class="fa-solid fa-mobile-screen-button" style="color: var(--palette-light-green); margin-right: 8px;"></i> GCash Account</h2>
+            <p class="subtext">Fast mobile wallet payments for instant online orders.</p>
+        </div>
+        {% if app.user.gcashNumber %}
+            <span class="badge-status active" style="font-size: 0.8rem; padding: 4px 10px;">
+                <i class="fa-solid fa-circle-check"></i> Attached
+            </span>
+        {% else %}
+            <span class="badge-status" style="font-size: 0.8rem; padding: 4px 10px; background: #f0f0f0; color: #777;">
+                Not Attached
+            </span>
+        {% endif %}
+    </div>
+
+    {% if app.user.gcashNumber %}
+        <div style="padding: 14px 16px; background: #f8faf8; border: 1.5px solid #d8e2d7; border-radius: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span style="font-size: 0.8rem; color: var(--palette-gray); text-transform: uppercase; font-weight: 600; display: block;">Linked Mobile Number</span>
+                <strong style="font-size: 1.05rem; color: var(--palette-dark-green); letter-spacing: 0.5px;">{{ app.user.gcashNumber }}</strong>
+            </div>
+            <form method="POST" action="{{ path('app_account') }}" onsubmit="return confirm('Are you sure you want to remove your GCash account?');" style="margin: 0;">
+                <input type="hidden" name="action" value="remove_payment_option">
+                <input type="hidden" name="payment_type" value="gcash">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('remove_payment_option') }}">
+                <button type="submit" class="account-btn secondary" style="padding: 6px 12px; font-size: 0.85rem; color: #b91c1c; border-color: #fca5a5;">
+                    <i class="fa-solid fa-trash-can"></i> Remove
+                </button>
+            </form>
+        </div>
+    {% endif %}
+
+    <form class="account-form" method="POST" action="{{ path('app_account') }}">
+        <input type="hidden" name="action" value="update_payment_options">
+        <input type="hidden" name="payment_type" value="gcash">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_payment_options') }}">
+
+        <div class="account-field">
+            <label for="gcash_number">{{ app.user.gcashNumber ? 'Update GCash Mobile Number' : 'Attach GCash Mobile Number' }}</label>
+            <input type="text" id="gcash_number" name="gcash_number" placeholder="e.g. 09171234567" value="{{ app.user.gcashNumber }}" required pattern="[0-9]{10,13}">
+            <small style="color: var(--palette-gray); font-size: 0.8rem;">Enter your 11-digit Philippine mobile number linked to GCash.</small>
+        </div>
+
+        <button type="submit" class="account-btn">
+            <i class="fa-solid fa-floppy-disk"></i> {{ app.user.gcashNumber ? 'Save New GCash Number' : 'Attach GCash Account' }}
+        </button>
+    </form>
+</section>
+
+<!-- Credit / Debit Card Panel -->
+<section class="account-panel">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <div>
+            <h2><i class="fa-solid fa-credit-card" style="color: var(--palette-light-green); margin-right: 8px;"></i> Credit / Debit Card</h2>
+            <p class="subtext">Secure card payments via Visa, Mastercard, or JCB.</p>
+        </div>
+        {% if app.user.cardNumber %}
+            <span class="badge-status active" style="font-size: 0.8rem; padding: 4px 10px;">
+                <i class="fa-solid fa-circle-check"></i> Attached
+            </span>
+        {% else %}
+            <span class="badge-status" style="font-size: 0.8rem; padding: 4px 10px; background: #f0f0f0; color: #777;">
+                Not Attached
+            </span>
+        {% endif %}
+    </div>
+
+    {% if app.user.cardNumber %}
+        <div style="padding: 14px 16px; background: #f8faf8; border: 1.5px solid #d8e2d7; border-radius: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <span style="font-size: 0.8rem; color: var(--palette-gray); text-transform: uppercase; font-weight: 600; display: block;">Saved Card</span>
+                <strong style="font-size: 1.05rem; color: var(--palette-dark-green); letter-spacing: 1px;">
+                    •••• •••• •••• {{ app.user.cardNumber|slice(-4) }}
+                </strong>
+            </div>
+            <form method="POST" action="{{ path('app_account') }}" onsubmit="return confirm('Are you sure you want to remove this card?');" style="margin: 0;">
+                <input type="hidden" name="action" value="remove_payment_option">
+                <input type="hidden" name="payment_type" value="card">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('remove_payment_option') }}">
+                <button type="submit" class="account-btn secondary" style="padding: 6px 12px; font-size: 0.85rem; color: #b91c1c; border-color: #fca5a5;">
+                    <i class="fa-solid fa-trash-can"></i> Remove
+                </button>
+            </form>
+        </div>
+    {% endif %}
+
+    <form class="account-form" method="POST" action="{{ path('app_account') }}">
+        <input type="hidden" name="action" value="update_payment_options">
+        <input type="hidden" name="payment_type" value="card">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_payment_options') }}">
+
+        <div class="account-field">
+            <label for="card_number">{{ app.user.cardNumber ? 'Replace Card Number' : 'Attach Card Number' }}</label>
+            <input type="text" id="card_number" name="card_number" placeholder="e.g. 4111 2222 3333 4444" required minlength="12" maxlength="19">
+            <small style="color: var(--palette-gray); font-size: 0.8rem;">Enter your 12 to 16 digit card number.</small>
+        </div>
+
+        <button type="submit" class="account-btn">
+            <i class="fa-solid fa-floppy-disk"></i> {{ app.user.cardNumber ? 'Save New Card' : 'Attach Card' }}
+        </button>
+    </form>
+</section>

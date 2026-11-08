@@ -156,6 +156,25 @@
         hidden: { action: 'delete_account' },
         csrf_token_id: 'delete_account',
     } %}
+
+    {% include 'partials/modals/cancel_order.html.twig' with {
+        id: 'cancelOrderModal',
+        message: 'Cancel this order? This cannot be undone and goes to the shop.',
+        action_url: path('app_account'),
+    } %}
+
+    <script>
+        // set the order_id for the cancel modal, clear the previous reason and open it
+        function prepareCancelOrder(orderId) {
+            var modal = document.getElementById('cancelOrderModal');
+            modal.querySelector('input[name="order_id"]').value = orderId;
+            var reason = modal.querySelector('textarea[name="cancel_reason"]');
+            reason.value = '';
+            modal.querySelector('button[type="submit"]').disabled = true;
+            ConfirmModal.open('cancelOrderModal');
+            reason.focus();
+        }
+    </script>
 {% endif %}
 
 {% if is_granted('ROLE_ADMIN') %}

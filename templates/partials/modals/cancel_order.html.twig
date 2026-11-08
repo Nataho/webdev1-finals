@@ -1,0 +1,56 @@
+{# Cancel-order confirmation modal.
+   Unlike the plain confirm modal, confirming requires a typed cancellation
+   reason (textarea); the confirm button stays disabled until text is entered
+   and the server revalidates the reason anyway. #}
+<div id="{{ id }}" class="confirm-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="confirm-modal-box">
+        <div class="confirm-modal-icon">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+        <form method="{{ (method ?? 'POST')|upper }}" action="{{ action_url }}">
+            <input type="hidden" name="action" value="cancel_order">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('cancel_order') }}">
+            <input type="hidden" name="order_id" value="">
+
+            <div class="confirm-modal-body">
+                <p class="confirm-modal-message">{{ message }}</p>
+                <textarea
+                    name="cancel_reason"
+                    class="cancel-reason-input"
+                    rows="3"
+                    maxlength="300"
+                    required
+                    placeholder="Why are you cancelling? (e.g. wrong item ordered, ordered too many, no longer needed)"></textarea>
+            </div>
+
+            <div class="confirm-modal-actions">
+                <button type="button" class="btn-modal-cancel" onclick="ConfirmModal.close('{{ id }}')">
+                    Keep Order
+                </button>
+                <button type="submit" class="btn-modal-confirm danger" id="{{ id }}_confirmBtn" disabled>
+                    Cancel Order
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    (function () {
+        var modal = document.getElementById('{{ id }}');
+        var reason = modal.querySelector('textarea[name="cancel_reason"]');
+        var confirmBtn = document.getElementById('{{ id }}_confirmBtn');
+
+        // the confirm button wakes up as soon as something meaningful is typed
+        reason.addEventListener('input', function () {
+            confirmBtn.disabled = reason.value.trim().length === 0;
+        });
+
+        // seatbelt: a too short reason never reaches the server
+        modal.querySelector('form').addEventListener('submit', function (event) {
+            if (reason.value.trim().length < 5) {
+                event.preventDefault();
+            }
+        });
+    })();
+</script>

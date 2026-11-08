@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Order;
 use App\Entity\User;
 use App\Service\FileUploader;
 use Doctrine\DBAL\Connection;
@@ -31,6 +32,8 @@ final class AccountController extends AbstractController
         'edit_address',
         'delete_address',
         'set_default_address',
+        'update_order_status',
+        'cancel_order',
     ];
 
     public function __construct(
@@ -94,16 +97,46 @@ final class AccountController extends AbstractController
 
         // fetch data for the logs tab
         $orders_list = [];
+        $status_counts = [];
+        $status_filter = null;
         if ($active_tab === 'logs') {
+            // ?status= narrows the list; anything outside the pipeline falls back to all orders
+            $status_filter = $request->query->getString('status');
+            if (!in_array($status_filter, Order::STATUSES, true)) {
+                $status_filter = null;
+            }
+
             if ($isAdmin) {
-                $orders_list = $this->connection->fetchAllAssociative(
-                    'SELECT o.*, u.user_name, u.user_email FROM orders o LEFT JOIN users u ON o.user_id = u.user_id ORDER BY o.order_date DESC'
+                $sql = 'SELECT o.*, u.user_name, u.user_email FROM orders o LEFT JOIN users u ON o.user_id = u.user_id';
+                $params = [];
+                if ($status_filter !== null) {
+                    $sql .= ' WHERE o.status = ?';
+                    $params[] = $status_filter;
+                }
+                $orders_list = $this->connection->fetchAllAssociative($sql.' ORDER BY o.order_date DESC', $params);
+
+                $count_rows = $this->connection->fetchAllAssociative(
+                    'SELECT status, COUNT(*) AS total FROM orders GROUP BY status'
                 );
             } else {
-                $orders_list = $this->connection->fetchAllAssociative(
-                    'SELECT * FROM orders WHERE user_id = ? ORDER BY order_date DESC',
+                $sql = 'SELECT * FROM orders WHERE user_id = ?';
+                $params = [$user->getId()];
+                if ($status_filter !== null) {
+                    $sql .= ' AND status = ?';
+                    $params[] = $status_filter;
+                }
+                $orders_list = $this->connection->fetchAllAssociative($sql.' ORDER BY order_date DESC', $params);
+
+                $count_rows = $this->connection->fetchAllAssociative(
+                    'SELECT status, COUNT(*) AS total FROM orders WHERE user_id = ? GROUP BY status',
                     [$user->getId()]
                 );
+            }
+
+            // turn the counts into a status => total map (statuses with zero orders are just absent)
+            $status_counts = [];
+            foreach ($count_rows as $row) {
+                $status_counts[$row['status']] = (int) $row['total'];
             }
         }
 
@@ -149,6 +182,8 @@ final class AccountController extends AbstractController
             'allowed_tabs' => $allowed_tabs,
             'active_tab' => $active_tab,
             'orders_list' => $orders_list,
+            'status_counts' => $status_counts,
+            'status_filter' => $status_filter,
             'addresses' => $addresses,
 
             'user_q' => $user_q,
@@ -204,6 +239,8 @@ final class AccountController extends AbstractController
             'edit_address' => $this->editAddress($request, $user, $redirect),
             'delete_address' => $this->deleteAddress($request, $user, $redirect),
             'set_default_address' => $this->setDefaultAddress($request, $user, $redirect),
+            'update_order_status' => $isAdmin ? $this->updateOrderStatus($request, $redirect) : $redirect(['tab' => 'logs']),
+            'cancel_order' => $this->cancelOrder($request, $user, $redirect),
             default => null,
         };
     }
@@ -659,5 +696,86 @@ final class AccountController extends AbstractController
         }
 
         return $redirect(['tab' => 'addresses']);
+    }
+
+    private function updateOrderStatus(Request $request, \Closure $redirect): Response
+    {
+        $order_id = $request->getPayload()->getInt('order_id');
+        $new_status = $request->getPayload()->getString('new_status');
+
+        if (!in_array($new_status, Order::STATUSES, true)) {
+            $this->addFlash('error', 'Unknown order status.');
+
+            return $redirect(['tab' => 'logs']);
+        }
+
+        if ($order_id <= 0) {
+            $this->addFlash('error', 'Invalid order specified.');
+
+            return $redirect(['tab' => 'logs']);
+        }
+
+        $affected = $this->connection->executeStatement(
+            'UPDATE orders SET status = ? WHERE order_id = ?',
+            [$new_status, $order_id]
+        );
+
+        if ($affected > 0) {
+            $this->addFlash('success', "Order #{$order_id} status updated to '{$new_status}'.");
+        } else {
+            $this->addFlash('error', 'Order not found; status not updated.');
+        }
+
+        return $redirect(['tab' => 'logs']);
+    }
+
+    private function cancelOrder(Request $request, User $user, \Closure $redirect): Response
+    {
+        $order_id = $request->getPayload()->getInt('order_id');
+
+        if ($order_id <= 0) {
+            $this->addFlash('error', 'Invalid order specified.');
+
+            return $redirect(['tab' => 'logs']);
+        }
+
+        // only the order's owner may cancel it
+        $order = $this->connection->fetchAssociative(
+            'SELECT status, user_id FROM orders WHERE order_id = ? LIMIT 1',
+            [$order_id]
+        );
+
+        if (!$order || (int) $order['user_id'] !== $user->getId()) {
+            $this->addFlash('error', 'Order not found or not yours to cancel.');
+
+            return $redirect(['tab' => 'logs']);
+        }
+
+        if (!in_array((string) $order['status'], Order::CANCELLABLE_STATUSES, true)) {
+            $message = in_array('pending', Order::CANCELLABLE_STATUSES, true)
+                ? 'This order is already being processed and can no longer be cancelled. Please contact us if you still want it withdrawn.'
+                : 'This order can no longer be cancelled.';
+
+            $this->addFlash('error', $message);
+
+            return $redirect(['tab' => 'logs']);
+        }
+
+        // the typed reason is mandatory — anything leaner than 5 characters bounces back
+        $cancel_reason = trim($request->getPayload()->getString('cancel_reason'));
+        if (mb_strlen($cancel_reason) < 5) {
+            $this->addFlash('error', 'Please type a cancellation reason (at least 5 characters) — it goes to the shop.');
+
+            return $redirect(['tab' => 'logs']);
+        }
+
+        $this->connection->executeStatement(
+            "UPDATE orders SET status = 'cancelled', cancel_reason = ? WHERE order_id = ?",
+            [$cancel_reason, $order_id]
+        );
+
+        $this->addFlash('success', "Order #{$order_id} has been cancelled.");
+
+        return $redirect(['tab' => 'logs']);
     }
 }

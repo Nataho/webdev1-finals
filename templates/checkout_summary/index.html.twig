@@ -10,11 +10,8 @@
 {% endblock %}
 
 {% block body %}
+{% from 'partials/order_status_badge.html.twig' import badge %}
 <link rel="stylesheet" href="{{ asset('styles/checkout.css') }}">
-
-{# status badges mirror the old site's pending / active / banned coloring #}
-{% set status = (order.status|default('pending'))|lower %}
-{% set status_class = status in ['completed', 'delivered'] ? 'badge-status active' : (status in ['cancelled', 'declined'] ? 'badge-status banned' : 'badge-status pending') %}
 
 <main class="summary-container">
     <div class="summary-card">
@@ -35,9 +32,7 @@
                 </h2>
                 <p class="subtext" style="margin: 0;">Official purchase record &amp; checkout summary</p>
             </div>
-            <span class="{{ status_class }}" style="font-size: 0.95rem; padding: 6px 14px;">
-                <i class="fa-solid fa-circle-notch"></i> {{ (order.status|default('Pending'))|capitalize }}
-            </span>
+            {{ badge(order.status, 'font-size: 0.95rem; padding: 6px 14px;', 'circle-notch') }}
         </div>
 
         <!-- Order Metadata Grid -->
@@ -90,6 +85,12 @@
                     {% endif %}
                 </span>
             </div>
+            {% if (order.status|default(''))|lower == 'cancelled' and (order.cancel_reason is defined and order.cancel_reason) %}
+                <div class="order-meta-item" style="grid-column: 1 / -1; border-top: 1px dashed #d8e2d7; padding-top: 10px; margin-top: 2px;">
+                    <label><i class="fa-solid fa-circle-exclamation" style="color: #b91c1c;"></i> Cancellation Reason</label>
+                    <span style="font-weight: 500; color: #7f1d1d;">&ldquo;{{ order.cancel_reason }}&rdquo;</span>
+                </div>
+            {% endif %}
         </div>
 
         <!-- Items Purchased Table -->

@@ -1,3 +1,4 @@
+{% from 'partials/order_status_badge.html.twig' import badge %}
 <div class="panel-header-row">
     <div>
         <h2>Admin Overview & Dashboard</h2>
@@ -72,13 +73,10 @@
                             <td><strong>₱{{ order.total_amount|number_format(2) }}</strong></td>
 
                             <td>
-                                {% set status = (order.status ?? 'pending')|lower %}
-                                {% set status_class = status in ['completed', 'delivered'] ? 'badge-status active' : (status in ['cancelled', 'declined'] ? 'badge-status banned' : 'badge-status pending') %}
-                                
-                                <span class="{{ status_class }}">{{ (order.status ?? 'Pending')|capitalize }}</span>
+                                {{ badge(order.status ?? null) }}
                             </td>
                             <td style="text-align: right;">
-                                <a href="#none" class="table-btn-action primary" style="text-decoration: none; display: inline-flex; padding: 6px 12px; font-size: 0.8rem;" title="View Order Summary">
+                                <a href="{{ path('app_checkout_summary', { order_id: order.order_id }) }}" class="table-btn-action primary" style="text-decoration: none; display: inline-flex; padding: 6px 12px; font-size: 0.8rem;" title="View Order Summary">
                                     <i class="fa-solid fa-file-invoice"></i> View
                                 </a>
                             </td>

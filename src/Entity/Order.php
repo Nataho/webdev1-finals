@@ -12,6 +12,12 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'orders')]
 class Order
 {
+    /** Fulfillment pipeline — admins move orders through these in the account logs tab. */
+    public const STATUSES = ['pending', 'preparing', 'shipped', 'delivering', 'arrived', 'delivered', 'cancelled'];
+
+    /** Statuses a customer may still cancel their own order from ("too late" once the shop starts working on it). */
+    public const CANCELLABLE_STATUSES = ['pending'];
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'order_id')]
@@ -50,6 +56,9 @@ class Order
 
     #[ORM\Column(length: 50, nullable: true)]
     private ?string $recipientPhone = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $cancelReason = null;
 
     public function __construct()
     {
@@ -195,6 +204,18 @@ class Order
     public function setRecipientPhone(?string $recipientPhone): static
     {
         $this->recipientPhone = $recipientPhone;
+
+        return $this;
+    }
+
+    public function getCancelReason(): ?string
+    {
+        return $this->cancelReason;
+    }
+
+    public function setCancelReason(?string $cancelReason): static
+    {
+        $this->cancelReason = $cancelReason;
 
         return $this;
     }

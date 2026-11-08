@@ -61,6 +61,28 @@
     color: #dc2626;
 }
 
+.confirm-modal-body .cancel-reason-input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 84px;
+    padding: 10px 12px;
+    border: 1px solid rgba(43, 80, 46, 0.25);
+    border-radius: 10px;
+    background-color: #fbfdfb;
+    font-family: var(--document-font);
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: var(--palette-black);
+    resize: vertical;
+}
+
+.confirm-modal-body .cancel-reason-input:focus {
+    outline: none;
+    border-color: var(--palette-dark-green);
+    background-color: #fff;
+}
+
 .confirm-modal-message {
     font-family: var(--document-font);
     font-size: 1.05rem;

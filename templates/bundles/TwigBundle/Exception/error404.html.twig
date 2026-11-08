@@ -1,0 +1,43 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}404 - Not Found | Estrera Botanicals{% endblock %}
+{% block body_class %}error-page error-404{% endblock %}
+
+{% block body %}
+    {#
+    <?php
+    require_once 'config.php';
+
+    // Get the error code from the URL, default to 404 if none is provided
+    $error_code = $_GET['code'] ?? '404';
+
+    // Define the custom messages for different scenarios
+    $error_messages = [
+        '403' => [
+            'title' => '403 - Forbidden',
+            'desc' => 'Nice try! You do not have the required permissions to view this page.'
+        ],
+        '404' => [
+            'title' => '404 - Not Found',
+            'desc' => 'We dug everywhere, but the page you are looking for has been uprooted.'
+        ]
+    ];
+    ?>
+    #}
+
+    <main class="section-wrapper" style="text-align: center; padding: 90px 20px; min-height: 60vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+        <div style="width: 84px; height: 84px; border-radius: 50%; background: rgba(217, 83, 79, 0.12); display: flex; align-items: center; justify-content: center; margin-bottom: 24px; color: #d9534f; font-size: 2.4rem;">
+            <i class="fa-solid fa-seedling"></i>
+        </div>
+        <span style="font-family: var(--document-font); text-transform: uppercase; letter-spacing: 2px; font-weight: 700; font-size: 0.85rem; color: var(--palette-light-green); margin-bottom: 8px;">Botanical Alert</span>
+        <h1 style="font-family: var(--heading-font); font-size: 3rem; color: #d9534f; margin: 0 0 12px 0;">404 - Not Found</h1>
+        <p style="font-family: var(--document-font); font-size: 1.2rem; color: var(--palette-gray); max-width: 540px; line-height: 1.6; margin: 0 0 28px 0;">
+            We dug everywhere, but the page you are looking for has been uprooted.
+        </p>
+        <a href="{{ path('app_home') }}" class="btn" style="text-decoration: none;">
+            <i class="fa-solid fa-house" style="margin-right: 6px;"></i> Return to Safety
+        </a>
+    </main>
+
+    {% include 'partials/footer.html.twig' %}
+{% endblock %}

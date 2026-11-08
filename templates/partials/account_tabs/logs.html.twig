@@ -1,3 +1,4 @@
+{% from 'partials/order_status_badge.html.twig' import badge %}
 <section class="account-panel">
     <div class="panel-header-row">
         <div>
@@ -16,6 +17,21 @@
             </p>
         </div>
     </div>
+
+    <!-- Status Filter Chips -->
+    {% set total_orders = status_counts|reduce((carry, count) => carry + count, 0) %}
+    {% if total_orders > 0 %}
+        <div class="status-filter-row">
+            <a href="{{ path('app_account', { tab: 'logs' }) }}" class="status-filter-chip {{ status_filter ? '' : 'active' }}" title="Show every order regardless of status">
+                All ({{ total_orders }})
+            </a>
+            {% for status_option in constant('App\\Entity\\Order::STATUSES') %}
+                <a href="{{ path('app_account', { tab: 'logs', status: status_option }) }}" class="status-filter-chip {{ status_filter == status_option ? 'active' : '' }}">
+                    {{ status_option|capitalize }} ({{ status_counts[status_option] ?? 0 }})
+                </a>
+            {% endfor %}
+        </div>
+    {% endif %}
 
     <!-- Logs / Orders Table -->
     <div class="table-responsive">
@@ -37,7 +53,11 @@
                     <tr>
                         <td colspan="{{ is_granted('ROLE_ADMIN') ? 6 : 5 }}" class="empty-table-cell">
                             <i class="fa-solid fa-receipt" style="font-size: 2rem; color: #cbd5e1; display: block; margin-bottom: 8px;"></i>
-                            No orders found yet.
+                            {% if status_filter %}
+                                No {{ status_filter|capitalize }} orders found.
+                            {% else %}
+                                No orders found yet.
+                            {% endif %}
                         </td>
                     </tr>
                 {% else %}
@@ -61,14 +81,38 @@
                                 <strong>₱{{ order.total_amount|number_format(2) }}</strong>
                             </td>
                             <td>
-                                {% set status = (order.status|default('pending'))|lower %}
-                                {% set status_class = status in ['completed', 'delivered'] ? 'badge-status active' : (status in ['cancelled', 'declined'] ? 'badge-status banned' : 'badge-status pending') %}
-                                <span class="{{ status_class }}">{{ order.status|default('Pending')|capitalize }}</span>
+                                {% set badge_attrs = '' %}
+                                {% if (order.status|default(''))|lower == 'cancelled' and order.cancel_reason|default('') %}
+                                    {% set badge_attrs = 'title="Cancellation reason: ' ~ order.cancel_reason|e('html_attr') ~ '"' %}
+                                {% endif %}
+                                {{ badge(order.status, badge_attrs) }}
                             </td>
                             <td style="text-align: right;">
-                                <a href="#" class="table-btn-action primary" style="text-decoration: none; display: inline-flex;" title="View Order Summary">
-                                    <i class="fa-solid fa-file-invoice"></i> View Summary
-                                </a>
+                                <div class="status-action-stack">
+                                    <a href="{{ path('app_checkout_summary', { order_id: order.order_id }) }}" class="table-btn-action primary" style="text-decoration: none; display: inline-flex;" title="View Order Summary">
+                                        <i class="fa-solid fa-file-invoice"></i> View Summary
+                                    </a>
+                                    {% if not is_granted('ROLE_ADMIN') and (order.status|default('pending'))|lower in constant('App\\Entity\\Order::CANCELLABLE_STATUSES') %}
+                                        <button type="button" class="table-btn-action danger" onclick="prepareCancelOrder({{ order.order_id }})" title="Cancel this pending order">
+                                            <i class="fa-solid fa-xmark"></i> Cancel
+                                        </button>
+                                    {% endif %}
+                                    {% if is_granted('ROLE_ADMIN') %}
+                                        <form method="post" action="{{ path('app_account', { tab: 'logs' }) }}" class="status-update-form">
+                                            <input type="hidden" name="action" value="update_order_status">
+                                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_order_status') }}">
+                                            <input type="hidden" name="order_id" value="{{ order.order_id }}">
+                                            <select name="new_status" aria-label="New status for order #{{ '%05d'|format(order.order_id) }}">
+                                                {% for status_option in constant('App\\Entity\\Order::STATUSES') %}
+                                                    <option value="{{ status_option }}" {{ status_option|lower == (order.status|default('pending'))|lower ? 'selected' : '' }}>{{ status_option|capitalize }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button type="submit" class="table-btn-action primary" title="Apply the new status">
+                                                <i class="fa-solid fa-check"></i> Update
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                     {% endfor %}

@@ -646,6 +646,96 @@ body.account-page {
     color: #92400e;
 }
 
+/* fulfillment pipeline colors — pending > preparing > shipped > delivering > arrived > delivered */
+.badge-status.preparing {
+    background-color: #dbeafe;
+    color: #1d4ed8;
+}
+
+.badge-status.shipped {
+    background-color: #ede9fe;
+    color: #6d28d9;
+}
+
+.badge-status.delivering {
+    background-color: #cffafe;
+    color: #0e7490;
+}
+
+.badge-status.arrived {
+    background-color: #d3f1df;
+    color: #146c43;
+}
+
+/* admin controls to move an order through the pipeline (logs tab) */
+.status-action-stack {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.status-update-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-update-form select {
+    border: 1px solid #d9e2d8;
+    border-radius: 7px;
+    padding: 7px 8px;
+    font-family: var(--document-font);
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #2d4a37;
+    background-color: #fff;
+    cursor: pointer;
+    max-width: 130px;
+}
+
+.status-update-form select:focus {
+    outline: none;
+    border-color: var(--palette-light-green);
+}
+
+/* status filter chips (logs tab) */
+.status-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.status-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 16px;
+    border: 1px solid #d9e2d8;
+    border-radius: 20px;
+    background-color: #fff;
+    color: #2d4a37;
+    font-family: var(--document-font);
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.status-filter-chip:hover {
+    background-color: #f2f7f2;
+    border-color: var(--palette-light-green);
+    transform: translateY(-1px);
+}
+
+.status-filter-chip.active {
+    background-color: var(--palette-dark-green);
+    border-color: var(--palette-dark-green);
+    color: #fff;
+}
+
 .badge-mini.you {
     display: inline-block;
     font-size: 0.7rem;

@@ -1,0 +1,21 @@
+{# shared order fulfilment badge — used by the logs tab, admin dashboard and the summary page #}
+{# colors live in assets/styles/account.css under .badge-status #}
+{% macro badge(status, attrs = '', icon = null) %}
+    {% set s = (status|default('pending'))|lower %}
+    {% set class_map = {
+        completed: 'active',
+        delivered: 'active',
+        cancelled: 'banned',
+        declined: 'banned',
+        preparing: 'preparing',
+        shipped: 'shipped',
+        delivering: 'delivering',
+        arrived: 'arrived',
+    } %}
+    <span class="badge-status {{ class_map[s] ?? 'pending' }}"{{ attrs ? (' ' ~ attrs)|raw : '' }}>
+        {%- if icon -%}
+            <i class="fa-solid fa-{{ icon }}"></i>
+        {%- endif -%}
+        {{ s|capitalize }}
+    </span>
+{% endmacro %}

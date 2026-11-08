@@ -116,7 +116,158 @@
                     <span>₱{{ subtotal|number_format(2) }}</span>
                 </div>
 
-                <button type="button" class="btn-place-order" onclick="ConfirmModal.open('placeOrderModal')">
+                <!-- Delivery Address Section -->
+                <div class="checkout-address-section">
+                    <h4>
+                        <span><i class="fa-solid fa-location-dot" style="color: var(--palette-light-green);"></i> Delivery Address</span>
+                        {% if addresses is not empty %}
+                            <button type="button" onclick="toggleNewAddressDrawer()" style="background:none; border:none; color: var(--palette-dark-green); font-size: 0.8rem; cursor: pointer; text-decoration: underline;">
+                                + New Address
+                            </button>
+                        {% endif %}
+                    </h4>
+
+                    {% if addresses is not empty %}
+                        <div id="saved_addresses_list">
+                            {% for addr in addresses %}
+                                <label class="checkout-address-card {{ addr.is_default ? 'selected' : '' }}" style="display: block; cursor: pointer;">
+                                    <div style="display: flex; align-items: flex-start; gap: 8px;">
+                                        <input type="radio" name="checkout_address_id" value="{{ addr.address_id }}" {{ addr.is_default ? 'checked' : '' }} onchange="selectDeliveryAddress(this.value)" style="margin-top: 3px; accent-color: var(--palette-dark-green);">
+                                        <div style="flex: 1;">
+                                            <strong>{{ addr.label|default('Home') }} · {{ addr.recipient_name }}</strong>
+                                            <div style="color: #555; font-size: 0.8rem;">{{ addr.street_address }}, Brgy. {{ addr.barangay }}, {{ addr.city }}, {{ addr.region }}</div>
+                                            <div style="color: var(--palette-gray); font-size: 0.75rem;">Phone: {{ addr.phone_number }}</div>
+                                        </div>
+                                    </div>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <div id="new_address_drawer" class="checkout-address-drawer" style="{{ addresses is not empty ? 'display: none;' : '' }}">
+                        <p style="font-size: 0.8rem; color: var(--palette-gray); margin: 0 0 8px 0;">Enter destination details for this order:</p>
+                        <input type="text" id="chk_recipient_name" placeholder="Recipient Full Name" value="{{ app.user.username }}" oninput="syncAddressDetails()">
+                        <input type="text" id="chk_recipient_phone" placeholder="Contact Phone Number (e.g. 09171234567)" oninput="syncAddressDetails()">
+                        <input type="text" id="chk_region" placeholder="Region (e.g. Metro Manila)" oninput="syncAddressDetails()">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                            <input type="text" id="chk_city" placeholder="City / Municipality" oninput="syncAddressDetails()">
+                            <input type="text" id="chk_barangay" placeholder="Barangay" oninput="syncAddressDetails()">
+                        </div>
+                        <input type="text" id="chk_street" placeholder="Street Address, Building, House No." oninput="syncAddressDetails()">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">
+                            <input type="checkbox" id="chk_save_address" checked style="width: 14px; height: 14px; margin: 0; accent-color: var(--palette-dark-green);">
+                            <label for="chk_save_address" style="font-size: 0.78rem; color: #444; margin: 0; cursor: pointer;">Save this address to my profile</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Options -->
+                <div class="checkout-payment-methods">
+                    <h4>Payment Option</h4>
+                    <div class="payment-options-list">
+                        <!-- Cash on Delivery -->
+                        <label class="payment-method-card selected" id="opt_cod">
+                            <input type="radio" name="checkout_payment" value="cash_on_delivery" checked onchange="selectPaymentMethod('cash_on_delivery', 'opt_cod')">
+                            <div class="payment-method-details">
+                                <div class="payment-method-label">
+                                    <i class="fa-solid fa-hand-holding-dollar"></i> Cash on Delivery
+                                </div>
+                                <div class="payment-method-subtext">Pay cash upon delivery</div>
+                            </div>
+                        </label>
+
+                        <!-- GCash -->
+                        <label class="payment-method-card" id="opt_gcash">
+                            <input type="radio" name="checkout_payment" value="gcash" onchange="selectPaymentMethod('gcash', 'opt_gcash')">
+                            <div class="payment-method-details">
+                                <div class="payment-method-label">
+                                    <i class="fa-solid fa-mobile-screen-button"></i> GCash
+                                    {% if app.user.gcashNumber %}
+                                        <span class="attached-badge"><i class="fa-solid fa-circle-check"></i> Attached</span>
+                                    {% endif %}
+                                </div>
+                                <div class="payment-method-subtext">
+                                    {% if app.user.gcashNumber %}
+                                        {{ app.user.gcashNumber }}
+                                    {% else %}
+                                        Fast mobile e-wallet (attach once)
+                                    {% endif %}
+                                </div>
+
+                                {% if not app.user.gcashNumber %}
+                                    <div class="payment-input-drawer" id="drawer_gcash" style="display: none;">
+                                        <input type="text" id="input_gcash" placeholder="Enter GCash Number (e.g. 09171234567)" oninput="syncPaymentDetails()">
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </label>
+
+                        <!-- Card -->
+                        <label class="payment-method-card" id="opt_card">
+                            <input type="radio" name="checkout_payment" value="card" onchange="selectPaymentMethod('card', 'opt_card')">
+                            <div class="payment-method-details">
+                                <div class="payment-method-label">
+                                    <i class="fa-solid fa-credit-card"></i> Credit / Debit Card
+                                    {% if app.user.cardNumber %}
+                                        <span class="attached-badge"><i class="fa-solid fa-circle-check"></i> Attached</span>
+                                    {% endif %}
+                                </div>
+                                <div class="payment-method-subtext">
+                                    {% if app.user.cardNumber %}
+                                        •••• •••• •••• {{ app.user.cardNumber|slice(-4) }}
+                                    {% else %}
+                                        Visa, Mastercard, JCB (attach once)
+                                    {% endif %}
+                                </div>
+
+                                {% if not app.user.cardNumber %}
+                                    <div class="payment-input-drawer" id="drawer_card" style="display: none;">
+                                        <input type="text" id="input_card" placeholder="Enter Card Number (e.g. 4111 2222 3333 4444)" oninput="syncPaymentDetails()">
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </label>
+                    </div>
+
+                    <!-- Other Payment Methods / Add New Button -->
+                    <button type="button" class="btn-other-payment" id="btn_toggle_other_payment" onclick="toggleOtherPaymentDrawer()">
+                        <i class="fa-solid fa-plus-circle"></i> Other Payment Methods / Add New
+                    </button>
+
+                    <!-- Expandable Other Payment Methods Drawer -->
+                    <div id="other_payment_box" class="other-payment-box" style="display: none;">
+                        <div style="font-weight: 600; font-size: 0.88rem; color: var(--palette-dark-green); margin-bottom: 8px;">
+                            Choose method to add:
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                            <label style="flex: 1; display: flex; align-items: center; gap: 6px; padding: 8px; border: 1.5px solid #d8e2d7; border-radius: 6px; cursor: pointer; font-size: 0.85rem; background: #fff;" id="other_opt_gcash_label">
+                                <input type="radio" name="other_method_choice" value="other_gcash" onchange="selectOtherMethod('gcash')" style="accent-color: var(--palette-dark-green);">
+                                <span><i class="fa-solid fa-mobile-screen-button"></i> Add GCash</span>
+                            </label>
+                            <label style="flex: 1; display: flex; align-items: center; gap: 6px; padding: 8px; border: 1.5px solid #d8e2d7; border-radius: 6px; cursor: pointer; font-size: 0.85rem; background: #fff;" id="other_opt_card_label">
+                                <input type="radio" name="other_method_choice" value="other_card" onchange="selectOtherMethod('card')" style="accent-color: var(--palette-dark-green);">
+                                <span><i class="fa-solid fa-credit-card"></i> Add Card</span>
+                            </label>
+                        </div>
+
+                        <!-- Other GCash input -->
+                        <div id="other_input_gcash_wrap" style="display: none;">
+                            <input type="text" id="other_input_gcash" placeholder="Enter new GCash Number (e.g. 09171234567)" style="width: 100%; padding: 8px 10px; border: 1.5px solid #d8e2d7; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;" oninput="syncPaymentDetails()">
+                        </div>
+
+                        <!-- Other Card input -->
+                        <div id="other_input_card_wrap" style="display: none;">
+                            <input type="text" id="other_input_card" placeholder="Enter new Card Number (12-16 digits)" style="width: 100%; padding: 8px 10px; border: 1.5px solid #d8e2d7; border-radius: 6px; font-size: 0.85rem; box-sizing: border-box;" oninput="syncPaymentDetails()">
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
+                            <input type="checkbox" id="chk_save_payment_method" checked style="width: 14px; height: 14px; margin: 0; accent-color: var(--palette-dark-green);" onchange="syncPaymentDetails()">
+                            <label for="chk_save_payment_method" style="font-size: 0.78rem; color: #444; margin: 0; cursor: pointer;">Save to my account for future orders</label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-place-order" onclick="openPlaceOrderConfirmation()">
                     <i class="fa-solid fa-circle-check"></i> Place Order Now
                 </button>
 
@@ -136,9 +287,206 @@
     cancel_label: 'Review Cart',
     action_url: path('app_checkout'),
     method: 'POST',
-    hidden: { action: 'place_order', _csrf_token: csrf_token('place_order') },
+    hidden: {
+        action: 'place_order',
+        _csrf_token: csrf_token('place_order'),
+        payment_method: 'cash_on_delivery',
+        gcash_number: '',
+        card_number: '',
+        save_payment_method: '1',
+        selected_address_id: (addresses is not empty ? (addresses|filter(a => a.is_default)|first.address_id|default(addresses|first.address_id)) : '0'),
+        recipient_name: '',
+        recipient_phone: '',
+        region: '',
+        city: '',
+        barangay: '',
+        street_address: '',
+        save_address: '1'
+    },
     confirm_class: 'primary',
 } %}
+
+<script>
+    let currentPaymentMethod = 'cash_on_delivery';
+    let isOtherPaymentMode = false;
+    let otherPaymentChoice = null;
+
+    function selectDeliveryAddress(addrId) {
+        document.querySelectorAll('.checkout-address-card').forEach(el => el.classList.remove('selected'));
+        const input = document.querySelector(`input[name="checkout_address_id"][value="${addrId}"]`);
+        if (input) {
+            input.checked = true;
+            input.closest('.checkout-address-card')?.classList.add('selected');
+        }
+        const modalAddr = document.querySelector('#placeOrderModal input[name="selected_address_id"]');
+        if (modalAddr) modalAddr.value = addrId;
+
+        const newDrawer = document.getElementById('new_address_drawer');
+        if (newDrawer) newDrawer.style.display = 'none';
+    }
+
+    function toggleNewAddressDrawer() {
+        const newDrawer = document.getElementById('new_address_drawer');
+        if (!newDrawer) return;
+
+        if (newDrawer.style.display === 'none') {
+            newDrawer.style.display = 'block';
+            document.querySelectorAll('input[name="checkout_address_id"]').forEach(r => r.checked = false);
+            document.querySelectorAll('.checkout-address-card').forEach(el => el.classList.remove('selected'));
+            const modalAddr = document.querySelector('#placeOrderModal input[name="selected_address_id"]');
+            if (modalAddr) modalAddr.value = '0';
+            syncAddressDetails();
+        } else {
+            newDrawer.style.display = 'none';
+            const firstRadio = document.querySelector('input[name="checkout_address_id"]');
+            if (firstRadio) {
+                firstRadio.checked = true;
+                selectDeliveryAddress(firstRadio.value);
+            }
+        }
+    }
+
+    function syncAddressDetails() {
+        const modalAddr = document.querySelector('#placeOrderModal input[name="selected_address_id"]');
+        const rName = document.getElementById('chk_recipient_name');
+        const rPhone = document.getElementById('chk_recipient_phone');
+        const rRegion = document.getElementById('chk_region');
+        const rCity = document.getElementById('chk_city');
+        const rBrgy = document.getElementById('chk_barangay');
+        const rStreet = document.getElementById('chk_street');
+        const rSave = document.getElementById('chk_save_address');
+
+        if (rName) document.querySelector('#placeOrderModal input[name="recipient_name"]').value = rName.value.trim();
+        if (rPhone) document.querySelector('#placeOrderModal input[name="recipient_phone"]').value = rPhone.value.trim();
+        if (rRegion) document.querySelector('#placeOrderModal input[name="region"]').value = rRegion.value.trim();
+        if (rCity) document.querySelector('#placeOrderModal input[name="city"]').value = rCity.value.trim();
+        if (rBrgy) document.querySelector('#placeOrderModal input[name="barangay"]').value = rBrgy.value.trim();
+        if (rStreet) document.querySelector('#placeOrderModal input[name="street_address"]').value = rStreet.value.trim();
+        if (rSave) document.querySelector('#placeOrderModal input[name="save_address"]').value = rSave.checked ? '1' : '0';
+    }
+
+    function selectPaymentMethod(val, optId) {
+        isOtherPaymentMode = false;
+        currentPaymentMethod = val;
+        document.querySelectorAll('.payment-method-card').forEach(el => el.classList.remove('selected'));
+        const target = document.getElementById(optId);
+        if (target) target.classList.add('selected');
+
+        const otherBox = document.getElementById('other_payment_box');
+        if (otherBox) otherBox.style.display = 'none';
+
+        const gcashDrawer = document.getElementById('drawer_gcash');
+        if (gcashDrawer) gcashDrawer.style.display = (val === 'gcash') ? 'block' : 'none';
+
+        const cardDrawer = document.getElementById('drawer_card');
+        if (cardDrawer) cardDrawer.style.display = (val === 'card') ? 'block' : 'none';
+
+        syncPaymentDetails();
+    }
+
+    function toggleOtherPaymentDrawer() {
+        const box = document.getElementById('other_payment_box');
+        if (!box) return;
+
+        if (box.style.display === 'none') {
+            box.style.display = 'block';
+            document.querySelectorAll('.payment-method-card').forEach(el => el.classList.remove('selected'));
+            document.querySelectorAll('input[name="checkout_payment"]').forEach(r => r.checked = false);
+            isOtherPaymentMode = true;
+            if (!otherPaymentChoice) {
+                selectOtherMethod('gcash');
+            }
+        } else {
+            box.style.display = 'none';
+            selectPaymentMethod('cash_on_delivery', 'opt_cod');
+            const codRadio = document.querySelector('input[name="checkout_payment"][value="cash_on_delivery"]');
+            if (codRadio) codRadio.checked = true;
+        }
+    }
+
+    function selectOtherMethod(choice) {
+        otherPaymentChoice = choice;
+        currentPaymentMethod = choice; // 'gcash' or 'card'
+
+        const gcashWrap = document.getElementById('other_input_gcash_wrap');
+        const cardWrap = document.getElementById('other_input_card_wrap');
+        const gRadio = document.querySelector('input[name="other_method_choice"][value="other_gcash"]');
+        const cRadio = document.querySelector('input[name="other_method_choice"][value="other_card"]');
+
+        if (choice === 'gcash') {
+            if (gRadio) gRadio.checked = true;
+            if (gcashWrap) gcashWrap.style.display = 'block';
+            if (cardWrap) cardWrap.style.display = 'none';
+            document.getElementById('other_input_gcash')?.focus();
+        } else {
+            if (cRadio) cRadio.checked = true;
+            if (gcashWrap) gcashWrap.style.display = 'none';
+            if (cardWrap) cardWrap.style.display = 'block';
+            document.getElementById('other_input_card')?.focus();
+        }
+
+        syncPaymentDetails();
+    }
+
+    function syncPaymentDetails() {
+        const methodInput = document.querySelector('#placeOrderModal input[name="payment_method"]');
+        if (methodInput) methodInput.value = currentPaymentMethod;
+
+        const modalGcash = document.querySelector('#placeOrderModal input[name="gcash_number"]');
+        const modalCard = document.querySelector('#placeOrderModal input[name="card_number"]');
+        const modalSavePayment = document.querySelector('#placeOrderModal input[name="save_payment_method"]');
+
+        if (isOtherPaymentMode) {
+            if (currentPaymentMethod === 'gcash') {
+                const otherGcash = document.getElementById('other_input_gcash');
+                if (modalGcash && otherGcash) modalGcash.value = otherGcash.value.trim();
+            } else if (currentPaymentMethod === 'card') {
+                const otherCard = document.getElementById('other_input_card');
+                if (modalCard && otherCard) modalCard.value = otherCard.value.trim();
+            }
+            const saveCheck = document.getElementById('chk_save_payment_method');
+            if (modalSavePayment && saveCheck) modalSavePayment.value = saveCheck.checked ? '1' : '0';
+        } else {
+            const gcashInput = document.getElementById('input_gcash');
+            if (gcashInput && modalGcash) modalGcash.value = gcashInput.value.trim();
+
+            const cardInput = document.getElementById('input_card');
+            if (cardInput && modalCard) modalCard.value = cardInput.value.trim();
+        }
+    }
+
+    function openPlaceOrderConfirmation() {
+        syncPaymentDetails();
+        syncAddressDetails();
+
+        if (currentPaymentMethod === 'gcash') {
+            const input = isOtherPaymentMode ? document.getElementById('other_input_gcash') : document.getElementById('input_gcash');
+            const hasAttached = {{ app.user.gcashNumber ? 'true' : 'false' }};
+            if ((!hasAttached || isOtherPaymentMode) && input && !input.value.trim()) {
+                alert('Please enter your GCash mobile number to proceed.');
+                input.focus();
+                return;
+            }
+        }
+
+        if (currentPaymentMethod === 'card') {
+            const input = isOtherPaymentMode ? document.getElementById('other_input_card') : document.getElementById('input_card');
+            const hasAttached = {{ app.user.cardNumber ? 'true' : 'false' }};
+            if ((!hasAttached || isOtherPaymentMode) && input && !input.value.trim()) {
+                alert('Please enter your card number to proceed.');
+                input.focus();
+                return;
+            }
+        }
+
+        ConfirmModal.open('placeOrderModal');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        syncAddressDetails();
+        syncPaymentDetails();
+    });
+</script>
 
 <!-- Checkout notification modal (success/error flash after a redirect) -->
 {% set success_flashes = app.flashes('success') %}

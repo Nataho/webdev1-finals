@@ -7,7 +7,15 @@
             <a class="heading-nav" href="{{ path('app_about_us') }}">ABOUT US</a>
 
             {% if app.user %} {# if user exsists #}
-                <a class="heading-nav" id="heading-cta-button" href="{{ path('app_account') }}">My Account</a>
+                {% if is_granted('ROLE_ADMIN') %}
+                    {# admins land on their dashboard through the protected admin door #}
+                    <a class="heading-nav" id="heading-cta-button" href="{{ path('app_admin_account', { tab: 'dashboard' }) }}">Manage</a>
+                {% elseif is_granted('ROLE_STAFF') %}
+                    {# staff land straight in their product work area #}
+                    <a class="heading-nav" id="heading-cta-button" href="{{ path('app_account', { tab: 'stock' }) }}">My Products</a>
+                {% else %}
+                    <a class="heading-nav" id="heading-cta-button" href="{{ path('app_account') }}">My Account</a>
+                {% endif %}
             {% else %} {# if user don't exsist #}
                 <a class="heading-nav" id="heading-cta-button" href="{{ path('app_shop') }}">Shop Now</a>
             {% endif %}

@@ -25,3 +25,7 @@
 
 AGENTS.md
 CLAUDE.md
+
+###> tests folder (local only — never commit) ###
+/tests/
+###< tests folder ###

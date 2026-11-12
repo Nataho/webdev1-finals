@@ -23,6 +23,9 @@ final class AccountController extends AbstractController
         'change_password',
         'delete_account',
         'toggle_user_ban',
+        'create_user',
+        'edit_user',
+        'delete_user',
         'update_stock',
         'add_product',
         'delete_product',
@@ -147,6 +150,7 @@ final class AccountController extends AbstractController
         // fetch data for the users tab (admin only)
         $user_q = trim($request->query->getString('user_q'));
         $admin_users_list = [];
+        $edit_user_row = null;
         if ($active_tab === 'users' && $isAdmin) {
             if ($user_q !== '') {
                 $searchTerm = '%'.$user_q.'%';
@@ -162,6 +166,15 @@ final class AccountController extends AbstractController
                     'SELECT user_id, user_name, user_email, user_role, user_profile_pic
                     FROM users
                     ORDER BY user_id DESC'
+                );
+            }
+
+            // ?edit_id=N opens the edit panel for that account on the same tab
+            $edit_id = $request->query->getInt('edit_id');
+            if ($edit_id > 0) {
+                $edit_user_row = $this->connection->fetchAssociative(
+                    'SELECT user_id, user_name, user_email, user_role FROM users WHERE user_id = ?',
+                    [$edit_id]
                 );
             }
         }
@@ -192,6 +205,7 @@ final class AccountController extends AbstractController
 
             'user_q' => $user_q,
             'admin_users_list' => $admin_users_list,
+            'edit_user_row' => $edit_user_row,
 
             'stock_q' => $stock_q,
             'admin_products_list' => $admin_products_list,
@@ -223,7 +237,16 @@ final class AccountController extends AbstractController
 
         // admin-only actions bounce with a visible denial for everyone else,
         // before any token validation runs
-        $admin_actions = ['toggle_user_ban', 'update_stock', 'add_product', 'delete_product', 'update_order_status'];
+        $admin_actions = [
+            'toggle_user_ban',
+            'create_user',
+            'edit_user',
+            'delete_user',
+            'update_stock',
+            'add_product',
+            'delete_product',
+            'update_order_status',
+        ];
         if (in_array($action, $admin_actions, true) && !$isAdmin) {
             $this->addFlash('error', 'You do not have permission to do that.');
 
@@ -243,6 +266,9 @@ final class AccountController extends AbstractController
             'change_password' => $this->changePassword($request, $user, $redirect),
             'delete_account' => $this->deleteAccount($request, $user, $redirect),
             'toggle_user_ban' => $this->toggleUserBan($request, $user, $redirect),
+            'create_user' => $this->createUser($request, $redirect),
+            'edit_user' => $this->editUser($request, $user, $redirect),
+            'delete_user' => $this->deleteUser($request, $user, $redirect),
             'update_stock' => $this->updateStock($request, $redirect),
             'add_product' => $this->addProduct($request, $user, $redirect),
             'delete_product' => $this->deleteProduct($request, $redirect),
@@ -413,6 +439,233 @@ final class AccountController extends AbstractController
         $this->addFlash('success', 'banned' === $new_role ? 'User has been banned.' : 'User has been unbanned.');
 
         return $redirect(['tab' => 'users']);
+    }
+
+    private function createUser(Request $request, \Closure $redirect): Response
+    {
+        $tab = ['tab' => 'users'];
+
+        $name = trim($request->getPayload()->getString('new_user_name'));
+        $email = trim($request->getPayload()->getString('new_user_email'));
+        $role = $request->getPayload()->getString('new_user_role', 'customer');
+        $password = $request->getPayload()->getString('new_user_password');
+        $confirm = $request->getPayload()->getString('new_user_confirm');
+
+        if (mb_strlen($name) < 3) {
+            $this->addFlash('error', 'Name must be at least 3 characters long.');
+
+            return $redirect($tab);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->addFlash('error', 'Please enter a valid email address.');
+
+            return $redirect($tab);
+        }
+
+        if (!in_array($role, ['admin', 'staff', 'customer'], true)) {
+            $this->addFlash('error', 'Please choose a valid role.');
+
+            return $redirect($tab);
+        }
+
+        // same minimum as public signup (8 chars)
+        if (mb_strlen($password) < 8) {
+            $this->addFlash('error', 'Password must be at least 8 characters long.');
+
+            return $redirect($tab);
+        }
+
+        if ($password !== $confirm) {
+            $this->addFlash('error', 'Passwords do not match.');
+
+            return $redirect($tab);
+        }
+
+        $email_taken = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM users WHERE user_email = ?',
+            [$email]
+        );
+        if ($email_taken > 0) {
+            $this->addFlash('error', 'An account with that email already exists.');
+
+            return $redirect($tab);
+        }
+
+        $name_taken = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM users WHERE user_name = ?',
+            [$name]
+        );
+        if ($name_taken > 0) {
+            $this->addFlash('error', 'That username is already taken. Please choose another.');
+
+            return $redirect($tab);
+        }
+
+        // hash through the entity so the auto hasher picks the right algorithm
+        $hashed = $this->passwordHasher->hashPassword(new User(), $password);
+
+        $this->connection->executeStatement(
+            'INSERT INTO users (user_name, user_email, user_password, user_role) VALUES (?, ?, ?, ?)',
+            [$name, $email, $hashed, $role]
+        );
+
+        $this->addFlash('success', ucfirst($role)." account '{$name}' has been created.");
+
+        return $redirect($tab);
+    }
+
+    private function editUser(Request $request, User $currentUser, \Closure $redirect): Response
+    {
+        $tab = ['tab' => 'users'];
+
+        $target_id = $request->getPayload()->getInt('target_user_id');
+        if ($target_id <= 0) {
+            $this->addFlash('error', 'Invalid target user specified.');
+
+            return $redirect($tab);
+        }
+
+        $row = $this->connection->fetchAssociative(
+            'SELECT user_id, user_name, user_email, user_role FROM users WHERE user_id = ?',
+            [$target_id]
+        );
+
+        if (!$row) {
+            $this->addFlash('error', 'User not found.');
+
+            return $redirect($tab);
+        }
+
+        $name = trim($request->getPayload()->getString('edit_user_name'));
+        $email = trim($request->getPayload()->getString('edit_user_email'));
+        $role = $request->getPayload()->getString('edit_user_role', $row['user_role']);
+        $new_password = $request->getPayload()->getString('edit_user_password');
+
+        if (mb_strlen($name) < 3) {
+            $this->addFlash('error', 'Name must be at least 3 characters long.');
+
+            return $redirect($tab);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->addFlash('error', 'Please enter a valid email address.');
+
+            return $redirect($tab);
+        }
+
+        if (!in_array($role, ['admin', 'staff', 'customer'], true)) {
+            $this->addFlash('error', 'Please choose a valid role.');
+
+            return $redirect($tab);
+        }
+
+        if ('' !== $new_password && mb_strlen($new_password) < 8) {
+            $this->addFlash('error', 'Password must be at least 8 characters long.');
+
+            return $redirect($tab);
+        }
+
+        // an admin changing their own role could lock themselves out of the admin area
+        if ($target_id === $currentUser->getId() && $role !== $row['user_role']) {
+            $this->addFlash('error', 'You cannot change your own role.');
+
+            return $redirect($tab);
+        }
+
+        $email_taken = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM users WHERE user_email = ? AND user_id != ?',
+            [$email, $target_id]
+        );
+        if ($email_taken > 0) {
+            $this->addFlash('error', 'An account with that email already exists.');
+
+            return $redirect($tab);
+        }
+
+        $name_taken = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM users WHERE user_name = ? AND user_id != ?',
+            [$name, $target_id]
+        );
+        if ($name_taken > 0) {
+            $this->addFlash('error', 'That username is already taken. Please choose another.');
+
+            return $redirect($tab);
+        }
+
+        // empty password field = keep the current password
+        $hashed = '' !== $new_password ? $this->passwordHasher->hashPassword(new User(), $new_password) : null;
+
+        if (null !== $hashed) {
+            $this->connection->executeStatement(
+                'UPDATE users SET user_name = ?, user_email = ?, user_role = ?, user_password = ? WHERE user_id = ?',
+                [$name, $email, $role, $hashed, $target_id]
+            );
+        } else {
+            $this->connection->executeStatement(
+                'UPDATE users SET user_name = ?, user_email = ?, user_role = ? WHERE user_id = ?',
+                [$name, $email, $role, $target_id]
+            );
+        }
+
+        $this->addFlash('success', "User '{$name}' has been updated.".(null !== $hashed ? ' Their password has been reset.' : ''));
+
+        return $redirect($tab);
+    }
+
+    private function deleteUser(Request $request, User $currentUser, \Closure $redirect): Response
+    {
+        $tab = ['tab' => 'users'];
+
+        $typed = trim($request->getPayload()->getString('confirmation_input'));
+        $target_id = $request->getPayload()->getInt('target_user_id');
+
+        if ($target_id <= 0 || $target_id === $currentUser->getId()) {
+            $this->addFlash('error', 'Invalid target user specified.');
+
+            return $redirect($tab);
+        }
+
+        if ($typed !== 'DELETE_USER_ACCOUNT') {
+            $this->addFlash('error', 'User deletion cancelled: phrase did not match.');
+
+            return $redirect($tab);
+        }
+
+        $row = $this->connection->fetchAssociative(
+            'SELECT user_id, user_name, user_role, user_profile_pic FROM users WHERE user_id = ?',
+            [$target_id]
+        );
+
+        if (!$row) {
+            $this->addFlash('error', 'User not found.');
+
+            return $redirect($tab);
+        }
+
+        // mirror the ban guard: admin accounts are untouchable by other admins
+        if ('admin' === $row['user_role']) {
+            $this->addFlash('error', 'Administrator accounts cannot be deleted.');
+
+            return $redirect($tab);
+        }
+
+        $affected = $this->connection->executeStatement(
+            'DELETE FROM users WHERE user_id = ?',
+            [$target_id]
+        );
+
+        if ($affected > 0) {
+            if ($row['user_profile_pic']) {
+                $this->fileUploader->delete('avatars', $row['user_profile_pic']);
+            }
+
+            $this->addFlash('success', "User '{$row['user_name']}' has been permanently deleted.");
+        } else {
+            $this->addFlash('error', 'Failed to delete user or user not found.');
+        }
+
+        return $redirect($tab);
     }
 
     private function updateStock(Request $request, \Closure $redirect): Response

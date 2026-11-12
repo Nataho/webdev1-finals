@@ -2,7 +2,7 @@
     <div class="panel-header-row">
         <div>
             <h2>Manage Users</h2>
-            <p class="subtext">Search customer accounts, view their roles, and manage access.</p>
+            <p class="subtext">Create, edit, and manage every account's role and access.</p>
         </div>
     </div>
 
@@ -18,6 +18,100 @@
             <a href="{{ path('app_account', { tab: 'users' }) }}#users" class="account-btn outline">Clear</a>
         {% endif %}
     </form>
+
+    <!-- Create User Panel -->
+    <section class="account-panel">
+        <h2><i class="fa-solid fa-user-plus"></i> Create User Account</h2>
+        <p class="subtext">Add a new admin, staff, or customer account and set its starting password.</p>
+
+        <form class="account-form" method="POST" action="{{ path('app_account', { tab: 'users' }) }}">
+            <input type="hidden" name="action" value="create_user">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('create_user') }}">
+
+            <div class="form-row-2col">
+                <div class="account-field">
+                    <label for="new_user_name">Full Name / Username *</label>
+                    <input type="text" id="new_user_name" name="new_user_name" placeholder="e.g. Maria Santos" required minlength="3">
+                </div>
+                <div class="account-field">
+                    <label for="new_user_email">Email Address *</label>
+                    <input type="email" id="new_user_email" name="new_user_email" placeholder="e.g. maria@estrerabotanicals.com" required>
+                </div>
+            </div>
+
+            <div class="form-row-2col">
+                <div class="account-field">
+                    <label for="new_user_role">Role *</label>
+                    <select id="new_user_role" name="new_user_role" required>
+                        <option value="customer" selected>Customer</option>
+                        <option value="staff">Staff</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="account-field">
+                    <label for="new_user_password">Starting Password *</label>
+                    <input type="password" id="new_user_password" name="new_user_password" required minlength="8" autocomplete="new-password">
+                </div>
+            </div>
+
+            <div class="account-field">
+                <label for="new_user_confirm">Confirm Password *</label>
+                <input type="password" id="new_user_confirm" name="new_user_confirm" required minlength="8" autocomplete="new-password">
+            </div>
+
+            <button type="submit" class="account-btn" style="margin-top: 10px;">
+                <i class="fa-solid fa-plus"></i> Create User
+            </button>
+        </form>
+    </section>
+
+    {% if edit_user_row %}
+    <!-- Edit User Panel -->
+    <section class="account-panel">
+        <h2><i class="fa-solid fa-user-pen"></i> Edit User: {{ edit_user_row.user_name }}</h2>
+        <p class="subtext">Update the account details, change its role, or reset its password (leave blank to keep it).</p>
+
+        <form class="account-form" method="POST" action="{{ path('app_account', { tab: 'users' }) }}">
+            <input type="hidden" name="action" value="edit_user">
+            <input type="hidden" name="target_user_id" value="{{ edit_user_row.user_id }}">
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token('edit_user') }}">
+
+            <div class="form-row-2col">
+                <div class="account-field">
+                    <label for="edit_user_name">Full Name / Username *</label>
+                    <input type="text" id="edit_user_name" name="edit_user_name" value="{{ edit_user_row.user_name }}" required minlength="3">
+                </div>
+                <div class="account-field">
+                    <label for="edit_user_email">Email Address *</label>
+                    <input type="email" id="edit_user_email" name="edit_user_email" value="{{ edit_user_row.user_email }}" required>
+                </div>
+            </div>
+
+            <div class="form-row-2col">
+                <div class="account-field">
+                    <label for="edit_user_role">Role *</label>
+                    {% set current_role = edit_user_row.user_role in ['admin', 'staff', 'customer'] ? edit_user_row.user_role : 'customer' %}
+                    <select id="edit_user_role" name="edit_user_role" required>
+                        <option value="customer" {{ 'customer' == current_role ? 'selected' : '' }}>Customer</option>
+                        <option value="staff" {{ 'staff' == current_role ? 'selected' : '' }}>Staff</option>
+                        <option value="admin" {{ 'admin' == current_role ? 'selected' : '' }}>Admin</option>
+                    </select>
+                </div>
+                <div class="account-field">
+                    <label for="edit_user_password">Reset Password (optional)</label>
+                    <input type="password" id="edit_user_password" name="edit_user_password" minlength="8" placeholder="Leave blank to keep current password" autocomplete="new-password">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button type="submit" class="account-btn">
+                    <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                </button>
+                <a href="{{ path('app_account', { tab: 'users' }) }}#users" class="account-btn outline">Cancel</a>
+            </div>
+        </form>
+    </section>
+    {% endif %}
 
     <!-- Users Table -->
     <div class="table-responsive">
@@ -50,6 +144,8 @@
                             <td>
                                 {% if u.user_role == "banned"%}
                                     <span class="badge-status banned"><i class="fa-solid fa-ban"></i> Banned</span>
+                                {% elseif u.user_role == "staff" %}
+                                    <span class="badge-status staff"><i class="fa-solid fa-user-gear"></i> Staff</span>
                                 {% elseif u.user_role == "admin" %}
                                     <span class="badge-status admin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
                                 {% else %}
@@ -58,33 +154,42 @@
                             </td>
                             <td style="text-align: right;">
                                 {% if u.user_id != user.id %}
-                                    {% if u.user_role == "banned" %}
-                                    {# unban form #}
-                                        <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
-                                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
-                                            <input type="hidden" name="action" value="toggle_user_ban">
-                                            <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
-                                            <input type="hidden" name="target_action" value="unban">
-                                            <button type="submit" class="table-btn-action success" title="Unban User">
-                                                <i class="fa-solid fa-unlock"></i> Unban
-                                            </button>
-                                        </form>
-                                    {% else %}
-                                    {# ban form #}
-                                        <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
-                                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
-                                            <input type="hidden" name="action" value="toggle_user_ban">
-                                            <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
-                                            <input type="hidden" name="target_action" value="ban">
-                                            <button type="submit" class="table-btn-action danger" title="Ban User">
-                                                <i class="fa-solid fa-ban"></i> Ban
-                                            </button>
-                                        </form>
-                                    {% endif %}
+                                    <div style="display: inline-flex; gap: 6px; align-items: center;">
+                                        {# edit form opens in the panel above the table #}
+                                        <a href="{{ path('app_account', { tab: 'users', edit_id: u.user_id }) }}#users" class="table-btn-action primary" title="Edit User">
+                                            <i class="fa-solid fa-user-pen"></i> Edit
+                                        </a>
 
+                                        {% if u.user_role != "admin" %}
+                                            <button type="button" class="table-btn-action danger" title="Delete User" onclick="prepareDeleteUser({{ u.user_id }})">
+                                                <i class="fa-solid fa-trash"></i> Delete
+                                            </button>
+                                        {% endif %}
+
+                                        {% if u.user_role == "banned" %}
+                                            <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
+                                                <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
+                                                <input type="hidden" name="action" value="toggle_user_ban">
+                                                <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
+                                                <input type="hidden" name="target_action" value="unban">
+                                                <button type="submit" class="table-btn-action success" title="Unban User">
+                                                    <i class="fa-solid fa-unlock"></i> Unban
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
+                                                <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
+                                                <input type="hidden" name="action" value="toggle_user_ban">
+                                                <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
+                                                <input type="hidden" name="target_action" value="ban">
+                                                <button type="submit" class="table-btn-action danger" title="Ban User">
+                                                    <i class="fa-solid fa-ban"></i> Ban
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
                                 {% else %}
                                     <span style="font-size: 0.8rem; color: var(--palette-gray); italic;">(Self)</span>
-
                                 {% endif %}
                             </td>
                         </tr>

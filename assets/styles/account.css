@@ -241,6 +241,27 @@ body.account-page {
     box-shadow: 0 0 0 3px rgba(43, 80, 46, 0.1);
 }
 
+.account-field select {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid #d8e2d7;
+    border-radius: 9px;
+    background-color: #fafbfc;
+    font-family: var(--document-font);
+    font-size: 0.95rem;
+    color: var(--palette-black);
+    outline: none;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.account-field select:focus {
+    border-color: var(--palette-dark-green);
+    background-color: var(--palette-white);
+    box-shadow: 0 0 0 3px rgba(43, 80, 46, 0.1);
+}
+
 .account-field input[type="file"] {
     padding: 8px 12px;
     background-color: #fcfdfc;
@@ -636,6 +657,11 @@ body.account-page {
     color: #0369a1;
 }
 
+.badge-status.staff {
+    background-color: #ede9fe;
+    color: #6d28d9;
+}
+
 .badge-status.banned {
     background-color: #fee2e2;
     color: #991b1b;
@@ -784,6 +810,10 @@ body.account-page {
     border: none;
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+a.table-btn-action {
+    text-decoration: none;
 }
 
 .table-btn-action.danger {

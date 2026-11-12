@@ -116,10 +116,11 @@ final class AccountController extends AbstractController
         );
 
         // fetch data for the dashboard tab (admin only)
-        $users_count = $products_count = $orders_count = 0;
+        $users_count = $staff_count = $products_count = $orders_count = 0;
         $recent_orders = [];
         if ($isAdmin) {
             $users_count = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM users');
+            $staff_count = (int) $this->connection->fetchOne("SELECT COUNT(*) FROM users WHERE user_role = 'staff'");
             $products_count = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM products');
             $orders_count = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM orders');
             $recent_orders = $this->connection->fetchAllAssociative(
@@ -182,7 +183,7 @@ final class AccountController extends AbstractController
             if ($user_q !== '') {
                 $searchTerm = '%'.$user_q.'%';
                 $admin_users_list = $this->connection->fetchAllAssociative(
-                    'SELECT user_id, user_name, user_email, user_role, user_profile_pic
+                    'SELECT user_id, user_name, user_email, user_role, user_profile_pic, user_created_at
                     FROM users
                     WHERE user_name LIKE ? OR user_email LIKE ?
                     ORDER BY user_id DESC',
@@ -190,7 +191,7 @@ final class AccountController extends AbstractController
                 );
             } else {
                 $admin_users_list = $this->connection->fetchAllAssociative(
-                    'SELECT user_id, user_name, user_email, user_role, user_profile_pic
+                    'SELECT user_id, user_name, user_email, user_role, user_profile_pic, user_created_at
                     FROM users
                     ORDER BY user_id DESC'
                 );
@@ -235,6 +236,7 @@ final class AccountController extends AbstractController
             'avatar_file' => $avatar_file,
 
             'users_count' => $users_count,
+            'staff_count' => $staff_count,
             'products_count' => $products_count,
             'orders_count' => $orders_count,
             'recent_orders' => $recent_orders,

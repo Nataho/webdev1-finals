@@ -30,13 +30,14 @@
                     <th>User</th>
                     <th>Email</th>
                     <th>Role / Status</th>
+                    <th>Created</th>
                     <th style="text-align: right;">Action</th>
                 </tr>
             </thead>
             <tbody>
                 {% if admin_users_list is empty %}
                     <tr>
-                        <td colspan="4" class="empty-table-cell">No accounts found matching your search.</td>
+                        <td colspan="5" class="empty-table-cell">No accounts found matching your search.</td>
                     </tr>
                 {% else %}
                     {% for u in admin_users_list %}
@@ -59,6 +60,13 @@
                                     <span class="badge-status admin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
                                 {% else %}
                                     <span class="badge-status active"><i class="fa-solid fa-circle-check"></i> Customer</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if u.user_created_at %}
+                                    {{ u.user_created_at|date('M d, Y') }}
+                                {% else %}
+                                    <span style="color: var(--palette-gray);" title="Created before this column was tracked">—</span>
                                 {% endif %}
                             </td>
                             <td style="text-align: right;">

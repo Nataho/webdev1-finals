@@ -2,12 +2,14 @@
 
 namespace App\Security;
 
+use App\Entity\User;
 use App\Repository\UserRepository;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Authenticator\AbstractLoginFormAuthenticator;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\CsrfTokenBadge;
@@ -46,7 +48,14 @@ class AppAuthenticator extends AbstractLoginFormAuthenticator
 
         return new Passport(
             new UserBadge($userInput, function (string $userIdentifier): ?UserInterface {
-                return $this->userRepository->findOneByEmailOrUsername($userIdentifier);
+                $user = $this->userRepository->findOneByEmailOrUsername($userIdentifier);
+
+                // banned accounts cannot authenticate at all (not just at checkout)
+                if ($user instanceof User && $user->isBanned()) {
+                    throw new CustomUserMessageAuthenticationException('Your account has been restricted. Please contact the store.');
+                }
+
+                return $user;
             }),
             new PasswordCredentials($password),
             [

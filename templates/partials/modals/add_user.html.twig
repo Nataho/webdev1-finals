@@ -1,0 +1,52 @@
+{# Add-user modal — the create form as a dialog, opened from the Manage Users tab. #}
+<div id="addUserModal" class="confirm-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="confirm-modal-box wide-modal">
+        <div class="confirm-modal-body">
+            <h2 style="margin: 0 0 4px 0;"><i class="fa-solid fa-user-plus"></i> Add User</h2>
+            <p class="subtext" style="margin: 0 0 16px 0;">Create an admin, staff, or customer account and set its starting password.</p>
+
+            <form class="account-form" method="POST" action="{{ path('app_account', { tab: 'users' }) }}">
+                <input type="hidden" name="action" value="create_user">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('create_user') }}">
+
+                <div class="form-row-2col">
+                    <div class="account-field">
+                        <label for="new_user_name">Full Name / Username *</label>
+                        <input type="text" id="new_user_name" name="new_user_name" placeholder="e.g. Maria Santos" required minlength="3">
+                    </div>
+                    <div class="account-field">
+                        <label for="new_user_email">Email Address *</label>
+                        <input type="email" id="new_user_email" name="new_user_email" placeholder="e.g. maria@estrerabotanicals.com" required>
+                    </div>
+                </div>
+
+                <div class="form-row-2col">
+                    <div class="account-field">
+                        <label for="new_user_role">Role *</label>
+                        <select id="new_user_role" name="new_user_role" required>
+                            <option value="customer" selected>Customer</option>
+                            <option value="staff">Staff</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="account-field">
+                        <label for="new_user_password">Starting Password *</label>
+                        <input type="password" id="new_user_password" name="new_user_password" required minlength="8" autocomplete="new-password">
+                    </div>
+                </div>
+
+                <div class="account-field">
+                    <label for="new_user_confirm">Confirm Password *</label>
+                    <input type="password" id="new_user_confirm" name="new_user_confirm" required minlength="8" autocomplete="new-password">
+                </div>
+
+                <div class="confirm-modal-actions" style="margin-top: 18px;">
+                    <button type="button" class="btn-modal-cancel" onclick="ConfirmModal.close('addUserModal')">Cancel</button>
+                    <button type="submit" class="btn-modal-confirm">
+                        <i class="fa-solid fa-plus"></i> Create User
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

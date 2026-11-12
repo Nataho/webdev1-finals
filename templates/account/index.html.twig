@@ -201,6 +201,10 @@
         hidden: { action: 'delete_user', target_user_id: '' },
         csrf_token_id: 'delete_user',
     } %}
+
+    {% include 'partials/modals/add_user.html.twig' %}
+
+    {% include 'partials/modals/edit_user.html.twig' %}
 {% endif %}
 
 {% set alert_type = success_flashes ? 'success' : 'error' %}
@@ -233,6 +237,42 @@
     function prepareDeleteUser(userId) {
         document.querySelector('#deleteUserModal input[name="target_user_id"]').value = userId;
         ConfirmTypeModal.open('deleteUserModal');
+    }
+
+    // open the add-user modal with clean fields
+    function prepareAddUser() {
+        var modal = document.getElementById('addUserModal');
+        modal.querySelectorAll('input[type="text"], input[type="email"], input[type="password"]').forEach(function (input) {
+            input.value = '';
+        });
+        modal.querySelector('#new_user_role').value = 'customer';
+        ConfirmModal.open('addUserModal');
+    }
+
+    // fill the edit-user modal from the clicked row's data attributes
+    function prepareEditUser(button) {
+        var modal = document.getElementById('editUserModal');
+        var form = modal.querySelector('form');
+
+        form.querySelector('input[name="target_user_id"]').value = button.dataset.userId;
+        form.querySelector('#edit_user_name').value = button.dataset.userName;
+        form.querySelector('#edit_user_email').value = button.dataset.userEmail;
+
+        // banned rows swap the role select for the ban notice
+        var isBanned = button.dataset.userRole === 'banned';
+        var roleField = document.getElementById('edit_user_role_field');
+        var banNote = document.getElementById('edit_user_ban_note');
+        var roleSelect = form.querySelector('#edit_user_role');
+        roleField.style.display = isBanned ? 'none' : '';
+        banNote.style.display = isBanned ? '' : 'none';
+        // a hidden required select would block form submission
+        roleSelect.required = !isBanned;
+        if (!isBanned) {
+            roleSelect.value = button.dataset.userRole;
+        }
+
+        form.querySelector('#edit_user_password').value = '';
+        ConfirmModal.open('editUserModal');
     }
 </script>
 {% endif %}

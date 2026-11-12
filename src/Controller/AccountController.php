@@ -150,7 +150,6 @@ final class AccountController extends AbstractController
         // fetch data for the users tab (admin only)
         $user_q = trim($request->query->getString('user_q'));
         $admin_users_list = [];
-        $edit_user_row = null;
         if ($active_tab === 'users' && $isAdmin) {
             if ($user_q !== '') {
                 $searchTerm = '%'.$user_q.'%';
@@ -166,15 +165,6 @@ final class AccountController extends AbstractController
                     'SELECT user_id, user_name, user_email, user_role, user_profile_pic
                     FROM users
                     ORDER BY user_id DESC'
-                );
-            }
-
-            // ?edit_id=N opens the edit panel for that account on the same tab
-            $edit_id = $request->query->getInt('edit_id');
-            if ($edit_id > 0) {
-                $edit_user_row = $this->connection->fetchAssociative(
-                    'SELECT user_id, user_name, user_email, user_role FROM users WHERE user_id = ?',
-                    [$edit_id]
                 );
             }
         }
@@ -205,7 +195,6 @@ final class AccountController extends AbstractController
 
             'user_q' => $user_q,
             'admin_users_list' => $admin_users_list,
-            'edit_user_row' => $edit_user_row,
 
             'stock_q' => $stock_q,
             'admin_products_list' => $admin_products_list,
@@ -542,6 +531,13 @@ final class AccountController extends AbstractController
         $role = $request->getPayload()->getString('edit_user_role', $row['user_role']);
         $new_password = $request->getPayload()->getString('edit_user_password');
 
+        // a ban is a deliberate moderation action, not a role: editing a banned
+        // account never silently lifts it — the Unban button is the only path out
+        $is_banned_target = 'banned' === $row['user_role'];
+        if ($is_banned_target) {
+            $role = 'banned';
+        }
+
         if (mb_strlen($name) < 3) {
             $this->addFlash('error', 'Name must be at least 3 characters long.');
 
@@ -554,7 +550,7 @@ final class AccountController extends AbstractController
             return $redirect($tab);
         }
 
-        if (!in_array($role, ['admin', 'staff', 'customer'], true)) {
+        if (!$is_banned_target && !in_array($role, ['admin', 'staff', 'customer'], true)) {
             $this->addFlash('error', 'Please choose a valid role.');
 
             return $redirect($tab);
@@ -608,7 +604,12 @@ final class AccountController extends AbstractController
             );
         }
 
-        $this->addFlash('success', "User '{$name}' has been updated.".(null !== $hashed ? ' Their password has been reset.' : ''));
+        $this->addFlash(
+            'success',
+            "User '{$name}' has been updated."
+            .(null !== $hashed ? ' Their password has been reset.' : '')
+            .($is_banned_target ? ' Ban status is unchanged.' : '')
+        );
 
         return $redirect($tab);
     }

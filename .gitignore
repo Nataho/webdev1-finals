@@ -22,3 +22,6 @@
 ###> eb_shop seed file (contains password hashes + emails — never commit) ###
 /eb_shop_seed.sql
 ###< eb_shop seed file ###
+
+AGENTS.md
+CLAUDE.md

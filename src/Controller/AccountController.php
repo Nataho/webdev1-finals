@@ -66,6 +66,10 @@ final class AccountController extends AbstractController
         $active_tab = $request->query->get('tab', $default_tab);
 
         if (!in_array($active_tab, $allowed_tabs, true)) {
+            // staff/customers poking an admin tab get a visible denial, not a silent fallback
+            if (!$isAdmin && in_array($active_tab, ['dashboard', 'users', 'stock', 'add_product'], true)) {
+                $this->addFlash('error', 'You do not have permission to open that area.');
+            }
             $active_tab = $default_tab;
         }
 
@@ -217,6 +221,15 @@ final class AccountController extends AbstractController
             return null;
         }
 
+        // admin-only actions bounce with a visible denial for everyone else,
+        // before any token validation runs
+        $admin_actions = ['toggle_user_ban', 'update_stock', 'add_product', 'delete_product', 'update_order_status'];
+        if (in_array($action, $admin_actions, true) && !$isAdmin) {
+            $this->addFlash('error', 'You do not have permission to do that.');
+
+            return $redirect('update_order_status' === $action ? ['tab' => 'logs'] : []);
+        }
+
         // every action requires a valid CSRF token
         if (!$this->isCsrfTokenValid($action, $request->getPayload()->getString('_csrf_token'))) {
             $this->addFlash('error', 'Security token invalid or expired. Please try again.');
@@ -229,17 +242,17 @@ final class AccountController extends AbstractController
             'change_username' => $this->changeUsername($request, $user, $redirect),
             'change_password' => $this->changePassword($request, $user, $redirect),
             'delete_account' => $this->deleteAccount($request, $user, $redirect),
-            'toggle_user_ban' => $isAdmin ? $this->toggleUserBan($request, $user, $redirect) : $redirect(),
-            'update_stock' => $isAdmin ? $this->updateStock($request, $redirect) : $redirect(),
-            'add_product' => $isAdmin ? $this->addProduct($request, $user, $redirect) : $redirect(),
-            'delete_product' => $isAdmin ? $this->deleteProduct($request, $redirect) : $redirect(),
+            'toggle_user_ban' => $this->toggleUserBan($request, $user, $redirect),
+            'update_stock' => $this->updateStock($request, $redirect),
+            'add_product' => $this->addProduct($request, $user, $redirect),
+            'delete_product' => $this->deleteProduct($request, $redirect),
             'update_payment_options' => $this->updatePaymentOptions($request, $user, $redirect),
             'remove_payment_option' => $this->removePaymentOption($request, $user, $redirect),
             'add_address' => $this->addAddress($request, $user, $redirect),
             'edit_address' => $this->editAddress($request, $user, $redirect),
             'delete_address' => $this->deleteAddress($request, $user, $redirect),
             'set_default_address' => $this->setDefaultAddress($request, $user, $redirect),
-            'update_order_status' => $isAdmin ? $this->updateOrderStatus($request, $redirect) : $redirect(['tab' => 'logs']),
+            'update_order_status' => $this->updateOrderStatus($request, $redirect),
             'cancel_order' => $this->cancelOrder($request, $user, $redirect),
             default => null,
         };

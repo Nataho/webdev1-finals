@@ -114,6 +114,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->role === 'banned';
     }
 
+    // check if this account is an employee (not a customer, not an admin)
+    public function isStaff(): bool
+    {
+        return $this->role === 'staff';
+    }
+
     public function getProfilePic(): ?string
     {
         return $this->profilePic;
@@ -144,6 +150,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $roles = [];
         if ($this->role === 'admin') {
             $roles[] = 'ROLE_ADMIN';
+        } elseif ($this->role === 'staff') {
+            $roles[] = 'ROLE_STAFF';
         }
         // guarantee every user at least has ROLE_USER
         $roles[] = 'ROLE_USER';
@@ -156,7 +164,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function setRoles(array $roles): static
     {
-        $this->role = in_array('ROLE_ADMIN', $roles, true) ? 'admin' : 'customer';
+        $this->role = match (true) {
+            in_array('ROLE_ADMIN', $roles, true) => 'admin',
+            in_array('ROLE_STAFF', $roles, true) => 'staff',
+            default => 'customer',
+        };
 
         return $this;
     }

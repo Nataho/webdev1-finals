@@ -97,6 +97,9 @@
                     <a href="?tab=add_product" class="account-nav-tab {{ active_tab == 'add_product' ? 'active' : '' }}">
                         <i class="fa-solid fa-plus-circle"></i> Add New Product
                     </a>
+                    <a href="?tab=feedback" class="account-nav-tab {{ active_tab == 'feedback' ? 'active' : '' }}">
+                        <i class="fa-solid fa-quote-left"></i> Testimonials
+                    </a>
                 {% elseif is_granted("ROLE_STAFF") %}
                     <div class="nav-group-title">Staff Controls</div>
                     <a href="?tab=stock" class="account-nav-tab {{ active_tab == 'stock' ? 'active' : '' }}">
@@ -104,6 +107,9 @@
                     </a>
                     <a href="?tab=add_product" class="account-nav-tab {{ active_tab == 'add_product' ? 'active' : '' }}">
                         <i class="fa-solid fa-plus-circle"></i> Add New Product
+                    </a>
+                    <a href="?tab=feedback" class="account-nav-tab {{ active_tab == 'feedback' ? 'active' : '' }}">
+                        <i class="fa-solid fa-quote-left"></i> Testimonials
                     </a>
                 {% endif %}
             </nav>
@@ -131,6 +137,9 @@
 
             {% elseif active_tab == "add_product" %}
                 {% include "partials/account_tabs/add_product.html.twig" %}
+
+            {% elseif active_tab == "feedback" %}
+                {% include "partials/account_tabs/feedback.html.twig" %}
 
             {% else %}
                 {% include "partials/account_tabs/general.html.twig" %}
@@ -199,6 +208,8 @@
     } %}
 
     {% include 'partials/modals/edit_product.html.twig' %}
+
+    {% include 'partials/modals/add_feedback.html.twig' %}
 {% endif %}
 
 {% if is_granted('ROLE_ADMIN') %}
@@ -258,6 +269,16 @@
         modal.querySelector('#edit_product_current_img').textContent = button.dataset.productImg || 'none';
 
         ConfirmModal.open('editProductModal');
+    }
+
+    // open the add-testimonial modal with clean fields
+    function prepareAddFeedback() {
+        var modal = document.getElementById('addFeedbackModal');
+        modal.querySelector('input[name="feedback_name"]').value = '';
+        modal.querySelector('textarea[name="feedback_message"]').value = '';
+        modal.querySelector('input[name="feedback_role_label"]').value = 'Customer';
+        modal.querySelector('input[name="feedback_avatar"]').value = '';
+        ConfirmModal.open('addFeedbackModal');
     }
 </script>
 {% endif %}

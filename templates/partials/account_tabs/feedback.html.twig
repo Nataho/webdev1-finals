@@ -1,0 +1,48 @@
+<section class="account-panel" id="feedback">
+    <div class="panel-header-row">
+        <div>
+            <h2>Store Testimonials</h2>
+            <p class="subtext">Curate the customer quotes shown in the home page feedback section.</p>
+        </div>
+        <button type="button" class="account-btn" onclick="prepareAddFeedback()">
+            <i class="fa-solid fa-comment-dots"></i> Add Testimonial
+        </button>
+    </div>
+
+    {% if feedback_list is empty %}
+        <div style="text-align: center; padding: 40px 20px; background: #fafcfa; border: 1.5px dashed #d8e2d7; border-radius: 12px; margin-top: 10px;">
+            <i class="fa-solid fa-comments" style="font-size: 2.8rem; color: #a4bfa4; margin-bottom: 12px; display: inline-block;"></i>
+            <h3 style="margin: 0 0 6px 0; color: var(--palette-dark-green); font-size: 1.1rem;">No testimonials yet</h3>
+            <p class="subtext" style="margin: 0;">Add the first one — it appears on the home page immediately.</p>
+        </div>
+    {% else %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-top: 14px;">
+            {% for feedback in feedback_list %}
+                <div style="padding: 16px 18px; background: #ffffff; border: 1.5px solid #e2e8e2; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 10px;">
+                    <p style="font-family: var(--heading-font); color: var(--palette-dark-green); font-size: 0.98rem; margin: 0; font-style: italic; flex: 1;">&ldquo;{{ feedback.message }}&rdquo;</p>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        {% if feedback.avatarUrl %}
+                            <img src="{{ asset(feedback.avatarUrl) }}" alt="{{ feedback.name }}" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 1.5px solid var(--palette-light-green);">
+                        {% else %}
+                            <img src="{{ asset('images/3.png') }}" alt="" style="width: 38px; height: 38px; border-radius: 50%; object-fit: cover; border: 1.5px solid #e2e8e2;">
+                        {% endif %}
+                        <div style="flex: 1; min-width: 0;">
+                            <p style="margin: 0; font-weight: 600; color: var(--palette-dark-green); font-size: 0.9rem; overflow-wrap: anywhere;">{{ feedback.name }}</p>
+                            <p style="margin: 0; color: var(--palette-gray); font-size: 0.8rem;">{{ feedback.roleLabel }}</p>
+                        </div>
+                        <form method="POST" action="{{ path('app_account', { tab: 'feedback' }) }}"
+                              onsubmit="return confirm('Delete this testimonial? It disappears from the home page immediately.');"
+                              style="margin: 0;">
+                            <input type="hidden" name="action" value="delete_feedback">
+                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_feedback') }}">
+                            <input type="hidden" name="feedback_id" value="{{ feedback.id }}">
+                            <button type="submit" class="table-btn-action danger" title="Delete testimonial">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</section>

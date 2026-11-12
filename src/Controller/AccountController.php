@@ -3,10 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\Address;
+use App\Entity\Feedback;
 use App\Entity\Order;
 use App\Entity\Product;
 use App\Entity\User;
 use App\Repository\AddressRepository;
+use App\Repository\FeedbackRepository;
 use App\Repository\OrderRepository;
 use App\Repository\ProductRepository;
 use App\Repository\UserRepository;
@@ -44,6 +46,8 @@ final class AccountController extends AbstractController
         'set_default_address',
         'update_order_status',
         'cancel_order',
+        'add_feedback',
+        'delete_feedback',
     ];
 
     public function __construct(
@@ -52,6 +56,7 @@ final class AccountController extends AbstractController
         private readonly ProductRepository $productRepository,
         private readonly OrderRepository $orderRepository,
         private readonly AddressRepository $addressRepository,
+        private readonly FeedbackRepository $feedbackRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly FileUploader $fileUploader,
     ) {
@@ -94,17 +99,17 @@ final class AccountController extends AbstractController
         $allowed_tabs = ['general', 'payment_options', 'addresses', 'logs'];
         $isStaff = $this->isGranted('ROLE_STAFF');
         if ($isAdmin) {
-            $allowed_tabs = array_merge(['dashboard'], $allowed_tabs, ['users', 'stock', 'add_product']);
+            $allowed_tabs = array_merge(['dashboard'], $allowed_tabs, ['users', 'stock', 'add_product', 'feedback']);
         } elseif ($isStaff) {
             // staff are the shop's product managers: catalog tabs, no dashboard/users
-            $allowed_tabs = array_merge($allowed_tabs, ['stock', 'add_product']);
+            $allowed_tabs = array_merge($allowed_tabs, ['stock', 'add_product', 'feedback']);
         }
         $default_tab = $isAdmin ? 'dashboard' : 'general';
         $active_tab = $request->query->get('tab', $default_tab);
 
         if (!in_array($active_tab, $allowed_tabs, true)) {
             // staff/customers poking an admin tab get a visible denial, not a silent fallback
-            $denied_tabs = $isAdmin ? [] : ($isStaff ? ['dashboard', 'users'] : ['dashboard', 'users', 'stock', 'add_product']);
+            $denied_tabs = $isAdmin ? [] : ($isStaff ? ['dashboard', 'users'] : ['dashboard', 'users', 'stock', 'add_product', 'feedback']);
             if (in_array($active_tab, $denied_tabs, true)) {
                 $this->addFlash('error', 'You do not have permission to open that area.');
             }
@@ -169,6 +174,20 @@ final class AccountController extends AbstractController
             $admin_products_list = $this->productRepository->searchAll($stock_q !== '' ? '%'.$stock_q.'%' : '');
         }
 
+        // fetch data for the feedback tab (admins and staff curate the testimonials)
+        $feedback_list = [];
+        if ($active_tab === 'feedback' && ($isAdmin || $isStaff)) {
+            $feedback_list = $this->feedbackRepository->findLatest();
+            // resolve each avatar url server side so the card stays dumb
+            foreach ($feedback_list as $feedback) {
+                $feedback->setAvatarUrl(
+                    $this->fileUploader->exists('feedback', $feedback->getAvatar())
+                        ? 'uploads/feedback/'.$feedback->getAvatar()
+                        : null
+                );
+            }
+        }
+
         return $this->render('account/index.html.twig', [
             'allowed_tabs' => $allowed_tabs,
             'active_tab' => $active_tab,
@@ -182,6 +201,8 @@ final class AccountController extends AbstractController
 
             'stock_q' => $stock_q,
             'admin_products_list' => $admin_products_list,
+
+            'feedback_list' => $feedback_list,
 
             'user' => $user,
             'avatar_file' => $avatar_file,
@@ -235,6 +256,14 @@ final class AccountController extends AbstractController
             return $redirect();
         }
 
+        // testimonial curation is staff work too; plain customers bounce here
+        $feedback_actions = ['add_feedback', 'delete_feedback'];
+        if (in_array($action, $feedback_actions, true) && !$isAdmin && !$this->isGranted('ROLE_STAFF')) {
+            $this->addFlash('error', 'You do not have permission to do that.');
+
+            return $redirect();
+        }
+
         // every action requires a valid CSRF token
         if (!$this->isCsrfTokenValid($action, $request->getPayload()->getString('_csrf_token'))) {
             $this->addFlash('error', 'Security token invalid or expired. Please try again.');
@@ -263,8 +292,78 @@ final class AccountController extends AbstractController
             'set_default_address' => $this->setDefaultAddress($request, $user, $redirect),
             'update_order_status' => $this->updateOrderStatus($request, $redirect),
             'cancel_order' => $this->cancelOrder($request, $user, $redirect),
+            'add_feedback' => $this->addFeedback($request, $redirect),
+            'delete_feedback' => $this->deleteFeedback($request, $redirect),
             default => null,
         };
+    }
+
+    // add a storefront testimonial — staff/admin curate the home feedback section
+    private function addFeedback(Request $request, \Closure $redirect): Response
+    {
+        $name = trim($request->getPayload()->getString('feedback_name'));
+        $message = trim($request->getPayload()->getString('feedback_message'));
+        $role_label = trim($request->getPayload()->getString('feedback_role_label', 'Customer'));
+        if ($role_label === '') {
+            $role_label = 'Customer';
+        }
+
+        if ($name === '' || $message === '') {
+            $this->addFlash('error', 'Please fill in the customer name and the testimonial text.');
+
+            return $redirect(['tab' => 'feedback']);
+        }
+
+        // optional photo (same 5MB image gate as every other upload)
+        $avatar = null;
+        $file = $request->files->get('feedback_avatar');
+        if ($file instanceof UploadedFile) {
+            try {
+                $avatar = $this->fileUploader->uploadImage($file, 'feedback');
+            } catch (RuntimeException $e) {
+                $this->addFlash('error', 'Image upload failed: '.$e->getMessage());
+
+                return $redirect(['tab' => 'feedback']);
+            }
+        }
+
+        $feedback = (new Feedback())
+            ->setName($name)
+            ->setMessage($message)
+            ->setRoleLabel($role_label)
+            ->setAvatar($avatar);
+        $this->entityManager->persist($feedback);
+        $this->entityManager->flush();
+
+        $this->addFlash('success', 'Testimonial added — it now shows in the home page feedback section.');
+
+        return $redirect(['tab' => 'feedback']);
+    }
+
+    // take one testimonial off the home page (and its uploaded photo off disk)
+    private function deleteFeedback(Request $request, \Closure $redirect): Response
+    {
+        $feedback_id = (int) $request->getPayload()->getString('feedback_id');
+
+        $feedback = $this->feedbackRepository->find($feedback_id);
+
+        if (!$feedback instanceof Feedback) {
+            $this->addFlash('error', 'Testimonial not found.');
+
+            return $redirect(['tab' => 'feedback']);
+        }
+
+        $old_avatar = $feedback->getAvatar();
+        $this->entityManager->remove($feedback);
+        $this->entityManager->flush();
+
+        if ($old_avatar) {
+            $this->fileUploader->delete('feedback', $old_avatar);
+        }
+
+        $this->addFlash('success', 'Testimonial deleted.');
+
+        return $redirect(['tab' => 'feedback']);
     }
 
     private function updateAvatar(Request $request, User $user, \Closure $redirect): Response

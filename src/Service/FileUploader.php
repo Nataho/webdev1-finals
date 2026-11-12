@@ -99,4 +99,19 @@ final class FileUploader
 
         return is_file($this->projectDir.'/public/uploads/'.$subdir.'/'.$filename);
     }
+
+    /**
+     * Removes a stored upload; missing or blank filenames are ignored.
+     */
+    public function delete(string $subdir, ?string $filename): void
+    {
+        if (!$filename) {
+            return;
+        }
+
+        $path = $this->projectDir.'/public/uploads/'.$subdir.'/'.$filename;
+        if (is_file($path)) {
+            unlink($path);
+        }
+    }
 }

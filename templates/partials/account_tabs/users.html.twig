@@ -2,8 +2,11 @@
     <div class="panel-header-row">
         <div>
             <h2>Manage Users</h2>
-            <p class="subtext">Search customer accounts, view their roles, and manage access.</p>
+            <p class="subtext">Create, edit, and manage every account's role and access.</p>
         </div>
+        <button type="button" class="account-btn" onclick="prepareAddUser()">
+            <i class="fa-solid fa-user-plus"></i> Add User
+        </button>
     </div>
 
     <!-- Search / Filter Bar -->
@@ -46,10 +49,12 @@
                                     {% endif %}
                                 </div>
                             </td>
-                            <td>{{ u.user_email }}</td>
+                            <td><span class="cell-email" title="{{ u.user_email }}">{{ u.user_email|middle_truncate }}</span></td>
                             <td>
                                 {% if u.user_role == "banned"%}
                                     <span class="badge-status banned"><i class="fa-solid fa-ban"></i> Banned</span>
+                                {% elseif u.user_role == "staff" %}
+                                    <span class="badge-status staff"><i class="fa-solid fa-user-gear"></i> Staff</span>
                                 {% elseif u.user_role == "admin" %}
                                     <span class="badge-status admin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
                                 {% else %}
@@ -58,33 +63,45 @@
                             </td>
                             <td style="text-align: right;">
                                 {% if u.user_id != user.id %}
-                                    {% if u.user_role == "banned" %}
-                                    {# unban form #}
-                                        <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
-                                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
-                                            <input type="hidden" name="action" value="toggle_user_ban">
-                                            <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
-                                            <input type="hidden" name="target_action" value="unban">
-                                            <button type="submit" class="table-btn-action success" title="Unban User">
-                                                <i class="fa-solid fa-unlock"></i> Unban
-                                            </button>
-                                        </form>
-                                    {% else %}
-                                    {# ban form #}
-                                        <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
-                                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
-                                            <input type="hidden" name="action" value="toggle_user_ban">
-                                            <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
-                                            <input type="hidden" name="target_action" value="ban">
-                                            <button type="submit" class="table-btn-action danger" title="Ban User">
-                                                <i class="fa-solid fa-ban"></i> Ban
-                                            </button>
-                                        </form>
-                                    {% endif %}
+                                    <div style="display: inline-flex; gap: 6px; align-items: center;">
+                                        {# edit opens the prefilled modal — the row's data feeds prepareEditUser() #}
+                                        <button type="button" class="table-btn-action primary" title="Edit User"
+                                                data-user-id="{{ u.user_id }}" data-user-name="{{ u.user_name }}"
+                                                data-user-email="{{ u.user_email }}" data-user-role="{{ u.user_role }}"
+                                                onclick="prepareEditUser(this)">
+                                            <i class="fa-solid fa-user-pen"></i> Edit
+                                        </button>
 
+                                        {% if u.user_role != "admin" %}
+                                            <button type="button" class="table-btn-action danger" title="Delete User" onclick="prepareDeleteUser({{ u.user_id }})">
+                                                <i class="fa-solid fa-trash"></i> Delete
+                                            </button>
+                                        {% endif %}
+
+                                        {% if u.user_role == "banned" %}
+                                            <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
+                                                <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
+                                                <input type="hidden" name="action" value="toggle_user_ban">
+                                                <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
+                                                <input type="hidden" name="target_action" value="unban">
+                                                <button type="submit" class="table-btn-action success" title="Unban User">
+                                                    <i class="fa-solid fa-unlock"></i> Unban
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
+                                                <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
+                                                <input type="hidden" name="action" value="toggle_user_ban">
+                                                <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
+                                                <input type="hidden" name="target_action" value="ban">
+                                                <button type="submit" class="table-btn-action danger" title="Ban User">
+                                                    <i class="fa-solid fa-ban"></i> Ban
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
                                 {% else %}
-                                    <span style="font-size: 0.8rem; color: var(--palette-gray); italic;">(Self)</span>
-
+                                    <span style="font-size: 0.8rem; color: var(--palette-gray); font-style: italic;">(Self)</span>
                                 {% endif %}
                             </td>
                         </tr>

@@ -11,6 +11,8 @@
             <p class="subtext">
                 {% if is_granted("ROLE_ADMIN") %}
                     Review customer orders, transaction dates, and fulfillment status.
+                {% elseif is_granted("ROLE_STAFF") %}
+                    Review every store order, transaction dates, and their current status.
                 {% else %}
                     Track your recent purchases and delivery details.
                 {% endif %}
@@ -39,7 +41,7 @@
             <thead>
                 <tr>
                     <th>Order #</th>
-                    {% if is_granted("ROLE_ADMIN") %}
+                    {% if is_granted("ROLE_STAFF") %}
                     <th>Customer</th>
                     {% endif %}
                     <th>Date & Time</th>
@@ -51,7 +53,7 @@
             <tbody>
                 {% if orders_list is empty %}
                     <tr>
-                        <td colspan="{{ is_granted('ROLE_ADMIN') ? 6 : 5 }}" class="empty-table-cell">
+                        <td colspan="{{ is_granted('ROLE_STAFF') ? 6 : 5 }}" class="empty-table-cell">
                             <i class="fa-solid fa-receipt" style="font-size: 2rem; color: #cbd5e1; display: block; margin-bottom: 8px;"></i>
                             {% if status_filter %}
                                 No {{ status_filter|capitalize }} orders found.
@@ -66,11 +68,11 @@
                             <td>
                                 <strong>#{{ '%05d'|format(order.order_id) }}</strong>
                             </td>
-                            {% if is_granted("ROLE_ADMIN") %}
+                            {% if is_granted("ROLE_STAFF") %}
                                 <td>
                                     <div>
                                         <strong>{{ order.user_name|default('Unknown') }}</strong>
-                                        <div style="font-size: 0.8rem; color: var(--palette-gray);">{{ order.user_email|default('') }}</div>
+                                        <div class="cell-email" title="{{ order.user_email|default('') }}" style="font-size: 0.8rem; color: var(--palette-gray);">{{ (order.user_email|default(''))|middle_truncate }}</div>
                                     </div>
                                 </td>
                             {% endif %}
@@ -92,7 +94,7 @@
                                     <a href="{{ path('app_checkout_summary', { order_id: order.order_id }) }}" class="table-btn-action primary" style="text-decoration: none; display: inline-flex;" title="View Order Summary">
                                         <i class="fa-solid fa-file-invoice"></i> View Summary
                                     </a>
-                                    {% if not is_granted('ROLE_ADMIN') and (order.status|default('pending'))|lower in constant('App\\Entity\\Order::CANCELLABLE_STATUSES') %}
+                                    {% if not is_granted('ROLE_ADMIN') and order.user_id|default(0) == app.user.id and (order.status|default('pending'))|lower in constant('App\\Entity\\Order::CANCELLABLE_STATUSES') %}
                                         <button type="button" class="table-btn-action danger" onclick="prepareCancelOrder({{ order.order_id }})" title="Cancel this pending order">
                                             <i class="fa-solid fa-xmark"></i> Cancel
                                         </button>

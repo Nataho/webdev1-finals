@@ -38,10 +38,15 @@ security:
             # https://symfony.com/doc/current/security/impersonating_user.html
             # switch_user: true
 
+    # ROLE_ADMIN implies every lower role, so admin passes any staff gate too
+    role_hierarchy:
+        ROLE_ADMIN: [ROLE_STAFF, ROLE_USER]
+
     # Note: Only the *first* matching rule is applied
     access_control:
         - { path: ^/shop, roles: ROLE_USER}
-        # - { path: ^/admin, roles: ROLE_ADMIN }
+        - { path: ^/account, roles: ROLE_USER }
+        - { path: ^/admin, roles: ROLE_ADMIN }
         # - { path: ^/profile, roles: ROLE_USER }
 
 when@test:

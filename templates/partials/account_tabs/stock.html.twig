@@ -2,7 +2,11 @@
     <div class="panel-header-row">
         <div>
             <h2>Stock & Inventory</h2>
-            <p class="subtext">Manage current stock levels and inventory quantities for the store.</p>
+            {% if is_granted('ROLE_ADMIN') %}
+                <p class="subtext">Manage current stock levels and inventory quantities for the store.</p>
+            {% else %}
+                <p class="subtext">Browse the whole catalog. You can edit stock and delete only the products you created.</p>
+            {% endif %}
         </div>
     </div>
 
@@ -27,6 +31,7 @@
                     <th>Product</th>
                     <th>Price</th>
                     <th>Current Stock</th>
+                    <th>Created by</th>
                     <th style="text-align: right;">Update Stock</th>
                 </tr>
             </thead>
@@ -36,6 +41,7 @@
                         {% set qty = prod.product_stock_quantity|number_format %}
                         {% set stock_badge_class = qty <= 0 ? 'stock-out' : (qty <= 5 ? 'stock-low' : 'stock-ok') %}
                         {% set stock_badge_text = qty <= 0 ? 'Out of stock' : (qty <= 5 ? 'Low stock' : 'In stock') %}
+                        {% set can_manage = is_granted('ROLE_ADMIN') or prod.product_created_by == app.user.id %}
                         <tr>
                             <td>
                                 <div class="table-prod-name">
@@ -47,27 +53,49 @@
                             <td>
                                 <strong style="font-size: 1.05rem;">{{ qty }}</strong> <span style="font-size: 0.8rem; color: #888;">units</span>
                             </td>
+                            <td>
+                                {% if prod.product_created_by_name %}
+                                    {{ prod.product_created_by_name }}
+                                    {% if prod.product_created_by == app.user.id %}<span style="font-size: 0.8rem; color: #888;">(you)</span>{% endif %}
+                                {% else %}
+                                    <span style="color: #888;">—</span>
+                                {% endif %}
+                            </td>
                             <td style="text-align: right;">
-                                <div style="display: inline-flex; gap: 6px; justify-content: flex-end; align-items: center;">
-                                    <form method="POST" action="{{ path('app_account', { tab: 'stock' }) }}" class="stock-update-form" style="display: inline-flex; gap: 6px; align-items: center;">
-                                        <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_stock') }}">
-                                        <input type="hidden" name="action" value="update_stock">
-                                        <input type="hidden" name="product_id" value="{{ prod.product_id }}">
-                                        <input type="number" name="stock_quantity" value="{{ qty }}" data-initial="{{ qty }}" min="0" step="1" required class="stock-input">
-                                        <button type="submit" class="table-btn-action primary" title="Save Stock" disabled>
-                                            <i class="fa-solid fa-check"></i> Save
+                                {% if can_manage %}
+                                    <div style="display: inline-flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                                        <button type="button" class="table-btn-action" title="Edit Product" onclick="prepareEditProduct(this)"
+                                            data-product-id="{{ prod.product_id }}"
+                                            data-product-name="{{ prod.product_name }}"
+                                            data-product-price="{{ prod.product_price }}"
+                                            data-product-description="{{ prod.product_description|e('html_attr') }}"
+                                            data-product-img="{{ prod.product_img }}">
+                                            <i class="fa-solid fa-pen"></i>
                                         </button>
-                                    </form>
-                                    <button type="button" class="table-btn-action danger" title="Delete Product" onclick="prepareDeleteProduct({{ prod.product_id }})">
-                                        <i class="fa-solid fa-trash"></i>
-                                    </button>
-                                </div>
+                                        <form method="POST" action="{{ path('app_account', { tab: 'stock' }) }}" class="stock-update-form" style="display: inline-flex; gap: 6px; align-items: center;">
+                                            <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_stock') }}">
+                                            <input type="hidden" name="action" value="update_stock">
+                                            <input type="hidden" name="product_id" value="{{ prod.product_id }}">
+                                            <input type="number" name="new_stock" value="{{ qty }}" data-initial="{{ qty }}" min="0" step="1" required class="stock-input">
+                                            <button type="submit" class="table-btn-action primary" title="Save Stock" disabled>
+                                                <i class="fa-solid fa-check"></i> Save
+                                            </button>
+                                        </form>
+                                        <button type="button" class="table-btn-action danger" title="Delete Product" onclick="prepareDeleteProduct({{ prod.product_id }})">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <span title="Only the product's creator or an admin can edit this listing" style="color: var(--palette-gray); font-size: 0.85rem;">
+                                        <i class="fa-solid fa-lock"></i> Read only
+                                    </span>
+                                {% endif %}
                             </td>
                         </tr>
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="4" class="empty-table-cell">No products found.</td>
+                        <td colspan="5" class="empty-table-cell">No products found.</td>
                     </tr>
                 {% endif %}
             </tbody>

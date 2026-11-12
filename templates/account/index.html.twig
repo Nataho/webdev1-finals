@@ -80,17 +80,25 @@
                     <i class="fa-solid fa-location-dot"></i> Addresses
                 </a>
                 <a href="?tab=logs" class="account-nav-tab {{ active_tab == 'logs' ? 'active' : '' }}">
-                    <i class="fa-solid fa-clock-rotate-left"></i> {% if is_granted("ROLE_ADMIN") %} Store Logs & Orders {% else %} My Orders {% endif %}
+                    <i class="fa-solid fa-clock-rotate-left"></i> {% if is_granted("ROLE_STAFF") %} Store Logs & Orders {% else %} My Orders {% endif %}
                 </a>
 
                 {% if is_granted("ROLE_ADMIN") %}
                     <div class="nav-group-title">Admin Controls</div>
-                    <a href="?tab=dashboard" class="account-nav-tab {{ active_tab == 'dashboard' ? 'active' : '' }}">
+                    <a href="{{ path('app_admin_account', { tab: 'dashboard' }) }}" class="account-nav-tab {{ active_tab == 'dashboard' ? 'active' : '' }}">
                         <i class="fa-solid fa-chart-line"></i> Dashboard
                     </a>
-                    <a href="?tab=users" class="account-nav-tab {{ active_tab == 'users' ? 'active' : '' }}">
+                    <a href="{{ path('app_admin_account', { tab: 'users' }) }}" class="account-nav-tab {{ active_tab == 'users' ? 'active' : '' }}">
                         <i class="fa-solid fa-users"></i> Manage Users
                     </a>
+                    <a href="?tab=stock" class="account-nav-tab {{ active_tab == 'stock' ? 'active' : '' }}">
+                        <i class="fa-solid fa-boxes-stacked"></i> Stock & Inventory
+                    </a>
+                    <a href="?tab=add_product" class="account-nav-tab {{ active_tab == 'add_product' ? 'active' : '' }}">
+                        <i class="fa-solid fa-plus-circle"></i> Add New Product
+                    </a>
+                {% elseif is_granted("ROLE_STAFF") %}
+                    <div class="nav-group-title">Staff Controls</div>
                     <a href="?tab=stock" class="account-nav-tab {{ active_tab == 'stock' ? 'active' : '' }}">
                         <i class="fa-solid fa-boxes-stacked"></i> Stock & Inventory
                     </a>
@@ -177,7 +185,7 @@
     </script>
 {% endif %}
 
-{% if is_granted('ROLE_ADMIN') %}
+{% if is_granted('ROLE_STAFF') %}
     {% include 'partials/modals/confirm_type.html.twig' with {
         id: 'deleteProductModal',
         message: 'Are you sure you want to permanently delete this product? This cannot be undone.',
@@ -189,6 +197,26 @@
         hidden: { action: 'delete_product', product_id: '' },
         csrf_token_id: 'delete_product',
     } %}
+
+    {% include 'partials/modals/edit_product.html.twig' %}
+{% endif %}
+
+{% if is_granted('ROLE_ADMIN') %}
+    {% include 'partials/modals/confirm_type.html.twig' with {
+        id: 'deleteUserModal',
+        message: 'Are you sure you want to permanently delete this user account? This cannot be undone.',
+        word: 'DELETE_USER_ACCOUNT',
+        confirm_label: 'Delete User',
+        cancel_label: 'Cancel',
+        action_url: path('app_account'),
+        method: 'POST',
+        hidden: { action: 'delete_user', target_user_id: '' },
+        csrf_token_id: 'delete_user',
+    } %}
+
+    {% include 'partials/modals/add_user.html.twig' %}
+
+    {% include 'partials/modals/edit_user.html.twig' %}
 {% endif %}
 
 {% set alert_type = success_flashes ? 'success' : 'error' %}
@@ -209,12 +237,73 @@
 
 {% include 'partials/modals/scripts.html.twig' %}
 
-{% if is_granted('ROLE_ADMIN') %}
+{% if is_granted('ROLE_STAFF') %}
 <script>
     // set the product_id in the delete product modal before opening it
     function prepareDeleteProduct(productId) {
         document.querySelector('#deleteProductModal input[name="product_id"]').value = productId;
         ConfirmTypeModal.open('deleteProductModal');
+    }
+
+    // fill the edit-product modal from the clicked row's data attributes
+    function prepareEditProduct(button) {
+        var modal = document.getElementById('editProductModal');
+        var form = modal.querySelector('form');
+
+        form.querySelector('input[name="product_id"]').value = button.dataset.productId;
+        form.querySelector('input[name="product_name"]').value = button.dataset.productName;
+        form.querySelector('input[name="product_price"]').value = button.dataset.productPrice;
+        form.querySelector('textarea[name="product_description"]').value = button.dataset.productDescription;
+        form.querySelector('input[name="product_image"]').value = '';
+        modal.querySelector('#edit_product_current_img').textContent = button.dataset.productImg || 'none';
+
+        ConfirmModal.open('editProductModal');
+    }
+</script>
+{% endif %}
+
+{% if is_granted('ROLE_ADMIN') %}
+<script>
+    // set the target_user_id in the delete user modal before opening it
+    function prepareDeleteUser(userId) {
+        document.querySelector('#deleteUserModal input[name="target_user_id"]').value = userId;
+        ConfirmTypeModal.open('deleteUserModal');
+    }
+
+    // open the add-user modal with clean fields
+    function prepareAddUser() {
+        var modal = document.getElementById('addUserModal');
+        modal.querySelectorAll('input[type="text"], input[type="email"], input[type="password"]').forEach(function (input) {
+            input.value = '';
+        });
+        modal.querySelector('#new_user_role').value = 'customer';
+        ConfirmModal.open('addUserModal');
+    }
+
+    // fill the edit-user modal from the clicked row's data attributes
+    function prepareEditUser(button) {
+        var modal = document.getElementById('editUserModal');
+        var form = modal.querySelector('form');
+
+        form.querySelector('input[name="target_user_id"]').value = button.dataset.userId;
+        form.querySelector('#edit_user_name').value = button.dataset.userName;
+        form.querySelector('#edit_user_email').value = button.dataset.userEmail;
+
+        // banned rows swap the role select for the ban notice
+        var isBanned = button.dataset.userRole === 'banned';
+        var roleField = document.getElementById('edit_user_role_field');
+        var banNote = document.getElementById('edit_user_ban_note');
+        var roleSelect = form.querySelector('#edit_user_role');
+        roleField.style.display = isBanned ? 'none' : '';
+        banNote.style.display = isBanned ? '' : 'none';
+        // a hidden required select would block form submission
+        roleSelect.required = !isBanned;
+        if (!isBanned) {
+            roleSelect.value = button.dataset.userRole;
+        }
+
+        form.querySelector('#edit_user_password').value = '';
+        ConfirmModal.open('editUserModal');
     }
 </script>
 {% endif %}

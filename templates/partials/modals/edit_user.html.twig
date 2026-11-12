@@ -1,0 +1,56 @@
+{# Edit-user modal — fields are filled from the clicked row's data attributes by prepareEditUser(). #}
+<div id="editUserModal" class="confirm-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="confirm-modal-box wide-modal">
+        <div class="confirm-modal-body">
+            <h2 style="margin: 0 0 4px 0;"><i class="fa-solid fa-user-pen"></i> Edit User</h2>
+            <p class="subtext" style="margin: 0 0 16px 0;">Update the account details, change its role, or reset its password.</p>
+
+            <form class="account-form" method="POST" action="{{ path('app_account', { tab: 'users' }) }}">
+                <input type="hidden" name="action" value="edit_user">
+                <input type="hidden" name="target_user_id" value="">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('edit_user') }}">
+
+                <div class="form-row-2col">
+                    <div class="account-field">
+                        <label for="edit_user_name">Full Name / Username *</label>
+                        <input type="text" id="edit_user_name" name="edit_user_name" required minlength="3">
+                    </div>
+                    <div class="account-field">
+                        <label for="edit_user_email">Email Address *</label>
+                        <input type="email" id="edit_user_email" name="edit_user_email" required>
+                    </div>
+                </div>
+
+                <div class="form-row-2col">
+                    <div class="account-field" id="edit_user_role_field">
+                        <label for="edit_user_role">Role *</label>
+                        <select id="edit_user_role" name="edit_user_role" required>
+                            <option value="customer">Customer</option>
+                            <option value="staff">Staff</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="account-field" id="edit_user_ban_note" style="display: none;">
+                        <label>Role</label>
+                        {# a ban is deliberate moderation — editing never silently lifts it #}
+                        <div style="display: flex; align-items: center; gap: 8px; padding: 11px 14px; border: 1.5px dashed #f0c8c8; border-radius: 9px; background-color: #fff5f5; color: #991b1b; font-size: 0.9rem; box-sizing: border-box;">
+                            <i class="fa-solid fa-ban"></i>
+                            <span>Banned — use <strong>Unban</strong> first, then edit its role.</span>
+                        </div>
+                    </div>
+                    <div class="account-field">
+                        <label for="edit_user_password">Reset Password (optional)</label>
+                        <input type="password" id="edit_user_password" name="edit_user_password" minlength="8" placeholder="Leave blank to keep current password" autocomplete="new-password">
+                    </div>
+                </div>
+
+                <div class="confirm-modal-actions" style="margin-top: 18px;">
+                    <button type="button" class="btn-modal-cancel" onclick="ConfirmModal.close('editUserModal')">Cancel</button>
+                    <button type="submit" class="btn-modal-confirm">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

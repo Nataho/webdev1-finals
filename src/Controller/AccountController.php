@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 final class AccountController extends AbstractController
 {
@@ -23,8 +24,12 @@ final class AccountController extends AbstractController
         'change_password',
         'delete_account',
         'toggle_user_ban',
+        'create_user',
+        'edit_user',
+        'delete_user',
         'update_stock',
         'add_product',
+        'edit_product',
         'delete_product',
         'update_payment_options',
         'remove_payment_option',
@@ -49,6 +54,26 @@ final class AccountController extends AbstractController
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
 
+        return $this->renderAccountPage($request);
+    }
+
+    /**
+     * Admin-only mirror of the account page. The dedicated /admin path is what
+     * the security.yaml "^/admin → ROLE_ADMIN" rule protects, so non-admins are
+     * stopped by the firewall before any controller code runs. Same page,
+     * stricter door.
+     */
+    #[Route('/admin/account', name: 'app_admin_account')]
+    #[IsGranted('ROLE_ADMIN', message: 'Only administrators may open the admin area.')]
+    public function adminAccount(Request $request): Response
+    {
+        return $this->renderAccountPage($request);
+    }
+
+    private function renderAccountPage(Request $request): Response
+    {
+        $this->denyAccessUnlessGranted('ROLE_USER');
+
         /** @var User $user */
         $user = $this->getUser();
         $isAdmin = $this->isGranted('ROLE_ADMIN');
@@ -59,13 +84,22 @@ final class AccountController extends AbstractController
 
         // determine active tab
         $allowed_tabs = ['general', 'payment_options', 'addresses', 'logs'];
+        $isStaff = $this->isGranted('ROLE_STAFF');
         if ($isAdmin) {
             $allowed_tabs = array_merge(['dashboard'], $allowed_tabs, ['users', 'stock', 'add_product']);
+        } elseif ($isStaff) {
+            // staff are the shop's product managers: catalog tabs, no dashboard/users
+            $allowed_tabs = array_merge($allowed_tabs, ['stock', 'add_product']);
         }
         $default_tab = $isAdmin ? 'dashboard' : 'general';
         $active_tab = $request->query->get('tab', $default_tab);
 
         if (!in_array($active_tab, $allowed_tabs, true)) {
+            // staff/customers poking an admin tab get a visible denial, not a silent fallback
+            $denied_tabs = $isAdmin ? [] : ($isStaff ? ['dashboard', 'users'] : ['dashboard', 'users', 'stock', 'add_product']);
+            if (in_array($active_tab, $denied_tabs, true)) {
+                $this->addFlash('error', 'You do not have permission to open that area.');
+            }
             $active_tab = $default_tab;
         }
 
@@ -106,7 +140,8 @@ final class AccountController extends AbstractController
                 $status_filter = null;
             }
 
-            if ($isAdmin) {
+            if ($isAdmin || $isStaff) {
+                // admins and staff both see the full store order log; only admins may change statuses
                 $sql = 'SELECT o.*, u.user_name, u.user_email FROM orders o LEFT JOIN users u ON o.user_id = u.user_id';
                 $params = [];
                 if ($status_filter !== null) {
@@ -162,18 +197,22 @@ final class AccountController extends AbstractController
             }
         }
 
-        // fetch data for the stock tab (admin only)
+        // fetch data for the stock tab (admins and staff share the catalog view)
         $stock_q = trim($request->query->getString('stock_q'));
         $admin_products_list = [];
-        if ($active_tab === 'stock' && $isAdmin) {
+        if ($active_tab === 'stock' && ($isAdmin || $isStaff)) {
             if ($stock_q !== '') {
                 $admin_products_list = $this->connection->fetchAllAssociative(
-                    'SELECT * FROM products WHERE product_name LIKE ? ORDER BY product_id DESC',
+                    'SELECT p.*, u.user_name AS product_created_by_name
+                    FROM products p LEFT JOIN users u ON u.user_id = p.product_created_by
+                    WHERE p.product_name LIKE ? ORDER BY p.product_id DESC',
                     ['%'.$stock_q.'%']
                 );
             } else {
                 $admin_products_list = $this->connection->fetchAllAssociative(
-                    'SELECT * FROM products ORDER BY product_id DESC'
+                    'SELECT p.*, u.user_name AS product_created_by_name
+                    FROM products p LEFT JOIN users u ON u.user_id = p.product_created_by
+                    ORDER BY p.product_id DESC'
                 );
             }
         }
@@ -211,10 +250,36 @@ final class AccountController extends AbstractController
     private function handleAction(Request $request, User $user, bool $isAdmin): ?Response
     {
         $action = $request->getPayload()->getString('action');
-        $redirect = fn (array $params = []): Response => $this->redirectToRoute('app_account', $params);
+        // admins working through /admin/account stay on the admin surface after POST redirects
+        $redirect_route = 'app_admin_account' === $request->attributes->get('_route') ? 'app_admin_account' : 'app_account';
+        $redirect = fn (array $params = []): Response => $this->redirectToRoute($redirect_route, $params);
 
         if (!in_array($action, self::CSRF_ACTIONS, true)) {
             return null;
+        }
+
+        // admin-only actions bounce with a visible denial for everyone else,
+        // before any token validation runs
+        $admin_actions = [
+            'toggle_user_ban',
+            'create_user',
+            'edit_user',
+            'delete_user',
+            'update_order_status',
+        ];
+        if (in_array($action, $admin_actions, true) && !$isAdmin) {
+            $this->addFlash('error', 'You do not have permission to do that.');
+
+            return $redirect('update_order_status' === $action ? ['tab' => 'logs'] : []);
+        }
+
+        // product management is staff work too; only plain customers bounce here.
+        // staff still face per-row ownership checks inside the actions themselves
+        $product_actions = ['update_stock', 'add_product', 'edit_product', 'delete_product'];
+        if (in_array($action, $product_actions, true) && !$isAdmin && !$this->isGranted('ROLE_STAFF')) {
+            $this->addFlash('error', 'You do not have permission to do that.');
+
+            return $redirect();
         }
 
         // every action requires a valid CSRF token
@@ -229,17 +294,21 @@ final class AccountController extends AbstractController
             'change_username' => $this->changeUsername($request, $user, $redirect),
             'change_password' => $this->changePassword($request, $user, $redirect),
             'delete_account' => $this->deleteAccount($request, $user, $redirect),
-            'toggle_user_ban' => $isAdmin ? $this->toggleUserBan($request, $user, $redirect) : $redirect(),
-            'update_stock' => $isAdmin ? $this->updateStock($request, $redirect) : $redirect(),
-            'add_product' => $isAdmin ? $this->addProduct($request, $user, $redirect) : $redirect(),
-            'delete_product' => $isAdmin ? $this->deleteProduct($request, $redirect) : $redirect(),
+            'toggle_user_ban' => $this->toggleUserBan($request, $user, $redirect),
+            'create_user' => $this->createUser($request, $redirect),
+            'edit_user' => $this->editUser($request, $user, $redirect),
+            'delete_user' => $this->deleteUser($request, $user, $redirect),
+            'update_stock' => $this->updateStock($request, $user, $isAdmin, $redirect),
+            'add_product' => $this->addProduct($request, $user, $redirect),
+            'edit_product' => $this->editProduct($request, $user, $isAdmin, $redirect),
+            'delete_product' => $this->deleteProduct($request, $user, $isAdmin, $redirect),
             'update_payment_options' => $this->updatePaymentOptions($request, $user, $redirect),
             'remove_payment_option' => $this->removePaymentOption($request, $user, $redirect),
             'add_address' => $this->addAddress($request, $user, $redirect),
             'edit_address' => $this->editAddress($request, $user, $redirect),
             'delete_address' => $this->deleteAddress($request, $user, $redirect),
             'set_default_address' => $this->setDefaultAddress($request, $user, $redirect),
-            'update_order_status' => $isAdmin ? $this->updateOrderStatus($request, $redirect) : $redirect(['tab' => 'logs']),
+            'update_order_status' => $this->updateOrderStatus($request, $redirect),
             'cancel_order' => $this->cancelOrder($request, $user, $redirect),
             default => null,
         };
@@ -402,13 +471,258 @@ final class AccountController extends AbstractController
         return $redirect(['tab' => 'users']);
     }
 
-    private function updateStock(Request $request, \Closure $redirect): Response
+    private function createUser(Request $request, \Closure $redirect): Response
+    {
+        $tab = ['tab' => 'users'];
+
+        $name = trim($request->getPayload()->getString('new_user_name'));
+        $email = trim($request->getPayload()->getString('new_user_email'));
+        $role = $request->getPayload()->getString('new_user_role', 'customer');
+        $password = $request->getPayload()->getString('new_user_password');
+        $confirm = $request->getPayload()->getString('new_user_confirm');
+
+        if (mb_strlen($name) < 3) {
+            $this->addFlash('error', 'Name must be at least 3 characters long.');
+
+            return $redirect($tab);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->addFlash('error', 'Please enter a valid email address.');
+
+            return $redirect($tab);
+        }
+
+        if (!in_array($role, ['admin', 'staff', 'customer'], true)) {
+            $this->addFlash('error', 'Please choose a valid role.');
+
+            return $redirect($tab);
+        }
+
+        // same minimum as public signup (8 chars)
+        if (mb_strlen($password) < 8) {
+            $this->addFlash('error', 'Password must be at least 8 characters long.');
+
+            return $redirect($tab);
+        }
+
+        if ($password !== $confirm) {
+            $this->addFlash('error', 'Passwords do not match.');
+
+            return $redirect($tab);
+        }
+
+        $email_taken = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM users WHERE user_email = ?',
+            [$email]
+        );
+        if ($email_taken > 0) {
+            $this->addFlash('error', 'An account with that email already exists.');
+
+            return $redirect($tab);
+        }
+
+        $name_taken = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM users WHERE user_name = ?',
+            [$name]
+        );
+        if ($name_taken > 0) {
+            $this->addFlash('error', 'That username is already taken. Please choose another.');
+
+            return $redirect($tab);
+        }
+
+        // hash through the entity so the auto hasher picks the right algorithm
+        $hashed = $this->passwordHasher->hashPassword(new User(), $password);
+
+        $this->connection->executeStatement(
+            'INSERT INTO users (user_name, user_email, user_password, user_role) VALUES (?, ?, ?, ?)',
+            [$name, $email, $hashed, $role]
+        );
+
+        $this->addFlash('success', ucfirst($role)." account '{$name}' has been created.");
+
+        return $redirect($tab);
+    }
+
+    private function editUser(Request $request, User $currentUser, \Closure $redirect): Response
+    {
+        $tab = ['tab' => 'users'];
+
+        $target_id = $request->getPayload()->getInt('target_user_id');
+        if ($target_id <= 0) {
+            $this->addFlash('error', 'Invalid target user specified.');
+
+            return $redirect($tab);
+        }
+
+        $row = $this->connection->fetchAssociative(
+            'SELECT user_id, user_name, user_email, user_role FROM users WHERE user_id = ?',
+            [$target_id]
+        );
+
+        if (!$row) {
+            $this->addFlash('error', 'User not found.');
+
+            return $redirect($tab);
+        }
+
+        $name = trim($request->getPayload()->getString('edit_user_name'));
+        $email = trim($request->getPayload()->getString('edit_user_email'));
+        $role = $request->getPayload()->getString('edit_user_role', $row['user_role']);
+        $new_password = $request->getPayload()->getString('edit_user_password');
+
+        // a ban is a deliberate moderation action, not a role: editing a banned
+        // account never silently lifts it — the Unban button is the only path out
+        $is_banned_target = 'banned' === $row['user_role'];
+        if ($is_banned_target) {
+            $role = 'banned';
+        }
+
+        if (mb_strlen($name) < 3) {
+            $this->addFlash('error', 'Name must be at least 3 characters long.');
+
+            return $redirect($tab);
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->addFlash('error', 'Please enter a valid email address.');
+
+            return $redirect($tab);
+        }
+
+        if (!$is_banned_target && !in_array($role, ['admin', 'staff', 'customer'], true)) {
+            $this->addFlash('error', 'Please choose a valid role.');
+
+            return $redirect($tab);
+        }
+
+        if ('' !== $new_password && mb_strlen($new_password) < 8) {
+            $this->addFlash('error', 'Password must be at least 8 characters long.');
+
+            return $redirect($tab);
+        }
+
+        // an admin changing their own role could lock themselves out of the admin area
+        if ($target_id === $currentUser->getId() && $role !== $row['user_role']) {
+            $this->addFlash('error', 'You cannot change your own role.');
+
+            return $redirect($tab);
+        }
+
+        $email_taken = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM users WHERE user_email = ? AND user_id != ?',
+            [$email, $target_id]
+        );
+        if ($email_taken > 0) {
+            $this->addFlash('error', 'An account with that email already exists.');
+
+            return $redirect($tab);
+        }
+
+        $name_taken = (int) $this->connection->fetchOne(
+            'SELECT COUNT(*) FROM users WHERE user_name = ? AND user_id != ?',
+            [$name, $target_id]
+        );
+        if ($name_taken > 0) {
+            $this->addFlash('error', 'That username is already taken. Please choose another.');
+
+            return $redirect($tab);
+        }
+
+        // empty password field = keep the current password
+        $hashed = '' !== $new_password ? $this->passwordHasher->hashPassword(new User(), $new_password) : null;
+
+        if (null !== $hashed) {
+            $this->connection->executeStatement(
+                'UPDATE users SET user_name = ?, user_email = ?, user_role = ?, user_password = ? WHERE user_id = ?',
+                [$name, $email, $role, $hashed, $target_id]
+            );
+        } else {
+            $this->connection->executeStatement(
+                'UPDATE users SET user_name = ?, user_email = ?, user_role = ? WHERE user_id = ?',
+                [$name, $email, $role, $target_id]
+            );
+        }
+
+        $this->addFlash(
+            'success',
+            "User '{$name}' has been updated."
+            .(null !== $hashed ? ' Their password has been reset.' : '')
+            .($is_banned_target ? ' Ban status is unchanged.' : '')
+        );
+
+        return $redirect($tab);
+    }
+
+    private function deleteUser(Request $request, User $currentUser, \Closure $redirect): Response
+    {
+        $tab = ['tab' => 'users'];
+
+        $typed = trim($request->getPayload()->getString('confirmation_input'));
+        $target_id = $request->getPayload()->getInt('target_user_id');
+
+        if ($target_id <= 0 || $target_id === $currentUser->getId()) {
+            $this->addFlash('error', 'Invalid target user specified.');
+
+            return $redirect($tab);
+        }
+
+        if ($typed !== 'DELETE_USER_ACCOUNT') {
+            $this->addFlash('error', 'User deletion cancelled: phrase did not match.');
+
+            return $redirect($tab);
+        }
+
+        $row = $this->connection->fetchAssociative(
+            'SELECT user_id, user_name, user_role, user_profile_pic FROM users WHERE user_id = ?',
+            [$target_id]
+        );
+
+        if (!$row) {
+            $this->addFlash('error', 'User not found.');
+
+            return $redirect($tab);
+        }
+
+        // mirror the ban guard: admin accounts are untouchable by other admins
+        if ('admin' === $row['user_role']) {
+            $this->addFlash('error', 'Administrator accounts cannot be deleted.');
+
+            return $redirect($tab);
+        }
+
+        $affected = $this->connection->executeStatement(
+            'DELETE FROM users WHERE user_id = ?',
+            [$target_id]
+        );
+
+        if ($affected > 0) {
+            if ($row['user_profile_pic']) {
+                $this->fileUploader->delete('avatars', $row['user_profile_pic']);
+            }
+
+            $this->addFlash('success', "User '{$row['user_name']}' has been permanently deleted.");
+        } else {
+            $this->addFlash('error', 'Failed to delete user or user not found.');
+        }
+
+        return $redirect($tab);
+    }
+
+    private function updateStock(Request $request, User $user, bool $isAdmin, \Closure $redirect): Response
     {
         $product_id = $request->getPayload()->getInt('product_id');
         $new_stock = $request->getPayload()->getInt('new_stock');
 
         if ($product_id <= 0 || $new_stock < 0) {
             $this->addFlash('error', 'Invalid stock quantity entered.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        if (!$this->canManageProduct($product_id, $user, $isAdmin)) {
+            $this->addFlash('error', 'You can only manage products you created.');
 
             return $redirect(['tab' => 'stock']);
         }
@@ -449,20 +763,26 @@ final class AccountController extends AbstractController
         }
 
         $this->connection->executeStatement(
-            'INSERT INTO products (product_name, product_description, product_price, product_stock_quantity, product_img) VALUES (?, ?, ?, ?, ?)',
-            [$p_name, $p_desc, $p_price, $p_stock, $p_img]
+            'INSERT INTO products (product_name, product_description, product_price, product_stock_quantity, product_img, product_created_by) VALUES (?, ?, ?, ?, ?, ?)',
+            [$p_name, $p_desc, $p_price, $p_stock, $p_img, $user->getId()]
         );
         $this->addFlash('success', "Product '{$p_name}' added to store inventory!");
 
         return $redirect(['tab' => 'stock']);
     }
 
-    private function deleteProduct(Request $request, \Closure $redirect): Response
+    private function deleteProduct(Request $request, User $user, bool $isAdmin, \Closure $redirect): Response
     {
         $product_id = $request->getPayload()->getInt('product_id');
 
         if ($product_id <= 0) {
             $this->addFlash('error', 'Invalid product specified for deletion.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        if (!$this->canManageProduct($product_id, $user, $isAdmin)) {
+            $this->addFlash('error', 'You can only delete products you created.');
 
             return $redirect(['tab' => 'stock']);
         }
@@ -479,6 +799,82 @@ final class AccountController extends AbstractController
         }
 
         return $redirect(['tab' => 'stock']);
+    }
+
+    private function editProduct(Request $request, User $user, bool $isAdmin, \Closure $redirect): Response
+    {
+        $product_id = $request->getPayload()->getInt('product_id');
+        $p_name = trim($request->getPayload()->getString('product_name'));
+        $p_price = (float) $request->getPayload()->get('product_price', 0);
+        $p_desc = trim($request->getPayload()->getString('product_description'));
+
+        if ($product_id <= 0 || '' === $p_name || $p_price < 0) {
+            $this->addFlash('error', 'Please fill in all required product fields with valid numbers.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        // admins edit any product; staff only the ones they created
+        if (!$this->canManageProduct($product_id, $user, $isAdmin)) {
+            $this->addFlash('error', 'You can only edit products you created.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        $product = $this->connection->fetchAssociative(
+            'SELECT product_img FROM products WHERE product_id = ?',
+            [$product_id]
+        );
+        if (false === $product) {
+            $this->addFlash('error', 'Failed to edit product or product not found.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        $p_img = (string) ($product['product_img'] ?? '');
+
+        // optional replacement image
+        $file = $request->files->get('product_image');
+        if ($file instanceof UploadedFile) {
+            try {
+                $p_img = $this->fileUploader->uploadImage($file, 'products');
+            } catch (RuntimeException $e) {
+                $this->addFlash('error', 'Image upload failed: '.$e->getMessage());
+
+                return $redirect(['tab' => 'stock']);
+            }
+
+            // drop the replaced file so the uploads folder stays clean
+            $old_img = (string) ($product['product_img'] ?? '');
+            if ('' !== $old_img && $old_img !== $p_img) {
+                $this->fileUploader->delete('products', $old_img);
+            }
+        }
+
+        $this->connection->executeStatement(
+            'UPDATE products SET product_name = ?, product_description = ?, product_price = ?, product_img = ? WHERE product_id = ?',
+            [$p_name, $p_desc, $p_price, $p_img, $product_id]
+        );
+        $this->addFlash('success', "Product '{$p_name}' has been updated.");
+
+        return $redirect(['tab' => 'stock']);
+    }
+
+    /**
+     * Admins manage every catalog row; staff only the products they created.
+     */
+    private function canManageProduct(int $product_id, User $user, bool $isAdmin): bool
+    {
+        if ($isAdmin) {
+            return true;
+        }
+
+        $owner_id = $this->connection->fetchOne(
+            'SELECT product_created_by FROM products WHERE product_id = ?',
+            [$product_id]
+        );
+
+        return false !== $owner_id && null !== $owner_id && (int) $owner_id === $user->getId();
     }
 
     private function updatePaymentOptions(Request $request, User $user, \Closure $redirect): Response

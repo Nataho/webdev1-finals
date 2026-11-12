@@ -67,7 +67,7 @@
                             <td><strong>#{{ '%05d'|format(order.order_id) }}</strong></td>
                             <td>
                                 <strong>{{ order.user_name|default('Unknown') }}</strong>
-                                <span style="display: block; font-size: 0.8rem; color: var(--palette-gray);">{{ order.user_email|default('') }}</span>
+                                <span class="cell-email" title="{{ order.user_email|default('') }}" style="display: block; font-size: 0.8rem; color: var(--palette-gray);">{{ (order.user_email|default(''))|middle_truncate }}</span>
                             </td>
                             <td>{{ order.order_date|date('M d, Y · h:i A') }}</td>
                             <td><strong>₱{{ order.total_amount|number_format(2) }}</strong></td>

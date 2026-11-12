@@ -604,7 +604,11 @@ body.account-page {
 
 .account-table {
     width: 100%;
-    border-collapse: collapse;
+    /* separate + zero spacing paints identically to collapse, but avoids the
+       Chromium artifact where collapsed row borders render as white gaps
+       inside the horizontally-scrolled .table-responsive container */
+    border-collapse: separate;
+    border-spacing: 0;
     font-family: var(--document-font);
     font-size: 0.92rem;
     text-align: left;
@@ -622,6 +626,23 @@ body.account-page {
     padding: 14px 16px;
     border-bottom: 1px solid #edf2ee;
     vertical-align: middle;
+}
+
+/* long email addresses collapse to an ellipsis so the column can't dominate
+   the row layout — hover the text to see the full address in a tooltip.
+   display stays neutral: stacked sub-lines keep their block flow */
+.cell-email {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+    cursor: default;
+}
+
+/* a bare email span inside a table cell needs a box to clip against */
+td > span.cell-email {
+    display: inline-block;
 }
 
 .account-table tbody tr:hover {

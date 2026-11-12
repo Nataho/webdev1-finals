@@ -49,7 +49,7 @@
                                     {% endif %}
                                 </div>
                             </td>
-                            <td>{{ u.user_email }}</td>
+                            <td><span class="cell-email" title="{{ u.user_email }}">{{ u.user_email|middle_truncate }}</span></td>
                             <td>
                                 {% if u.user_role == "banned"%}
                                     <span class="badge-status banned"><i class="fa-solid fa-ban"></i> Banned</span>
@@ -101,7 +101,7 @@
                                         {% endif %}
                                     </div>
                                 {% else %}
-                                    <span style="font-size: 0.8rem; color: var(--palette-gray); italic;">(Self)</span>
+                                    <span style="font-size: 0.8rem; color: var(--palette-gray); font-style: italic;">(Self)</span>
                                 {% endif %}
                             </td>
                         </tr>

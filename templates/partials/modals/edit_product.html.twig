@@ -1,0 +1,46 @@
+{# Edit-product modal — fields are filled from the clicked row's data attributes by prepareEditProduct(). #}
+<div id="editProductModal" class="confirm-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="confirm-modal-box wide-modal">
+        <div class="confirm-modal-body">
+            <h2 style="margin: 0 0 4px 0;"><i class="fa-solid fa-pen-to-square"></i> Edit Product</h2>
+            <p class="subtext" style="margin: 0 0 16px 0;">Update the catalog details of this listing. Stock quantity is managed on the Stock &amp; Inventory tab.</p>
+
+            <form class="account-form" method="POST" action="{{ path('app_account', { tab: 'stock' }) }}" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="edit_product">
+                <input type="hidden" name="product_id" value="">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('edit_product') }}">
+
+                <div class="account-field">
+                    <label for="edit_product_name">Product Name *</label>
+                    <input type="text" id="edit_product_name" name="product_name" required>
+                </div>
+
+                <div class="form-row-2col">
+                    <div class="account-field">
+                        <label for="edit_product_price">Price (₱) *</label>
+                        <input type="number" id="edit_product_price" name="product_price" step="0.01" min="0" required>
+                    </div>
+                    <div class="account-field">
+                        <label for="edit_product_image">Replace Photo (optional)</label>
+                        <input type="file" id="edit_product_image" name="product_image" accept="image/*">
+                        <small style="font-size: 0.8rem; color: var(--palette-gray); margin-top: 4px; display: block;">
+                            Current photo: <span id="edit_product_current_img">—</span>. Leave empty to keep it.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="account-field">
+                    <label for="edit_product_description">Product Description</label>
+                    <textarea id="edit_product_description" name="product_description" rows="4"></textarea>
+                </div>
+
+                <div class="confirm-modal-actions" style="margin-top: 18px;">
+                    <button type="button" class="btn-modal-cancel" onclick="ConfirmModal.close('editProductModal')">Cancel</button>
+                    <button type="submit" class="btn-modal-confirm">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

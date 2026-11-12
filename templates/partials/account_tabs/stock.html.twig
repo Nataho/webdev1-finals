@@ -64,6 +64,14 @@
                             <td style="text-align: right;">
                                 {% if can_manage %}
                                     <div style="display: inline-flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                                        <button type="button" class="table-btn-action" title="Edit Product" onclick="prepareEditProduct(this)"
+                                            data-product-id="{{ prod.product_id }}"
+                                            data-product-name="{{ prod.product_name }}"
+                                            data-product-price="{{ prod.product_price }}"
+                                            data-product-description="{{ prod.product_description|e('html_attr') }}"
+                                            data-product-img="{{ prod.product_img }}">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </button>
                                         <form method="POST" action="{{ path('app_account', { tab: 'stock' }) }}" class="stock-update-form" style="display: inline-flex; gap: 6px; align-items: center;">
                                             <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_stock') }}">
                                             <input type="hidden" name="action" value="update_stock">

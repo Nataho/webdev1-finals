@@ -29,6 +29,7 @@ final class AccountController extends AbstractController
         'delete_user',
         'update_stock',
         'add_product',
+        'edit_product',
         'delete_product',
         'update_payment_options',
         'remove_payment_option',
@@ -274,7 +275,7 @@ final class AccountController extends AbstractController
 
         // product management is staff work too; only plain customers bounce here.
         // staff still face per-row ownership checks inside the actions themselves
-        $product_actions = ['update_stock', 'add_product', 'delete_product'];
+        $product_actions = ['update_stock', 'add_product', 'edit_product', 'delete_product'];
         if (in_array($action, $product_actions, true) && !$isAdmin && !$this->isGranted('ROLE_STAFF')) {
             $this->addFlash('error', 'You do not have permission to do that.');
 
@@ -299,6 +300,7 @@ final class AccountController extends AbstractController
             'delete_user' => $this->deleteUser($request, $user, $redirect),
             'update_stock' => $this->updateStock($request, $user, $isAdmin, $redirect),
             'add_product' => $this->addProduct($request, $user, $redirect),
+            'edit_product' => $this->editProduct($request, $user, $isAdmin, $redirect),
             'delete_product' => $this->deleteProduct($request, $user, $isAdmin, $redirect),
             'update_payment_options' => $this->updatePaymentOptions($request, $user, $redirect),
             'remove_payment_option' => $this->removePaymentOption($request, $user, $redirect),
@@ -795,6 +797,65 @@ final class AccountController extends AbstractController
         } else {
             $this->addFlash('error', 'Failed to delete product or product not found.');
         }
+
+        return $redirect(['tab' => 'stock']);
+    }
+
+    private function editProduct(Request $request, User $user, bool $isAdmin, \Closure $redirect): Response
+    {
+        $product_id = $request->getPayload()->getInt('product_id');
+        $p_name = trim($request->getPayload()->getString('product_name'));
+        $p_price = (float) $request->getPayload()->get('product_price', 0);
+        $p_desc = trim($request->getPayload()->getString('product_description'));
+
+        if ($product_id <= 0 || '' === $p_name || $p_price < 0) {
+            $this->addFlash('error', 'Please fill in all required product fields with valid numbers.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        // admins edit any product; staff only the ones they created
+        if (!$this->canManageProduct($product_id, $user, $isAdmin)) {
+            $this->addFlash('error', 'You can only edit products you created.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        $product = $this->connection->fetchAssociative(
+            'SELECT product_img FROM products WHERE product_id = ?',
+            [$product_id]
+        );
+        if (false === $product) {
+            $this->addFlash('error', 'Failed to edit product or product not found.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        $p_img = (string) ($product['product_img'] ?? '');
+
+        // optional replacement image
+        $file = $request->files->get('product_image');
+        if ($file instanceof UploadedFile) {
+            try {
+                $p_img = $this->fileUploader->uploadImage($file, 'products');
+            } catch (RuntimeException $e) {
+                $this->addFlash('error', 'Image upload failed: '.$e->getMessage());
+
+                return $redirect(['tab' => 'stock']);
+            }
+
+            // drop the replaced file so the uploads folder stays clean
+            $old_img = (string) ($product['product_img'] ?? '');
+            if ('' !== $old_img && $old_img !== $p_img) {
+                $this->fileUploader->delete('products', $old_img);
+            }
+        }
+
+        $this->connection->executeStatement(
+            'UPDATE products SET product_name = ?, product_description = ?, product_price = ?, product_img = ? WHERE product_id = ?',
+            [$p_name, $p_desc, $p_price, $p_img, $product_id]
+        );
+        $this->addFlash('success', "Product '{$p_name}' has been updated.");
 
         return $redirect(['tab' => 'stock']);
     }

@@ -197,6 +197,8 @@
         hidden: { action: 'delete_product', product_id: '' },
         csrf_token_id: 'delete_product',
     } %}
+
+    {% include 'partials/modals/edit_product.html.twig' %}
 {% endif %}
 
 {% if is_granted('ROLE_ADMIN') %}
@@ -241,6 +243,21 @@
     function prepareDeleteProduct(productId) {
         document.querySelector('#deleteProductModal input[name="product_id"]').value = productId;
         ConfirmTypeModal.open('deleteProductModal');
+    }
+
+    // fill the edit-product modal from the clicked row's data attributes
+    function prepareEditProduct(button) {
+        var modal = document.getElementById('editProductModal');
+        var form = modal.querySelector('form');
+
+        form.querySelector('input[name="product_id"]').value = button.dataset.productId;
+        form.querySelector('input[name="product_name"]').value = button.dataset.productName;
+        form.querySelector('input[name="product_price"]').value = button.dataset.productPrice;
+        form.querySelector('textarea[name="product_description"]').value = button.dataset.productDescription;
+        form.querySelector('input[name="product_image"]').value = '';
+        modal.querySelector('#edit_product_current_img').textContent = button.dataset.productImg || 'none';
+
+        ConfirmModal.open('editProductModal');
     }
 </script>
 {% endif %}

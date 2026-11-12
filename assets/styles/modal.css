@@ -288,3 +288,13 @@
     font-size: 1.25rem;
     font-weight: 700;
 }
+
+/* ==========================================================================
+   MOBILE — the box padding trims down once the viewport gets tight
+   (the box itself already shrinks: width 100% + overlay padding)
+   ========================================================================== */
+@media (max-width: 480px) {
+    .confirm-modal-box {
+        padding: 20px 16px;
+    }
+}

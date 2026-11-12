@@ -1,6 +1,10 @@
 <header>
         <h1>ESTRERA BOTANICALS</h1>
-        <nav>
+        <button type="button" class="nav-toggle" aria-label="Open navigation menu" aria-expanded="false" aria-controls="site-nav">
+            <i class="fa-solid fa-bars"></i>
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+        <nav id="site-nav">
             <a class="heading-nav" href="{{ path('app_home') }}">HOME</a>
             <a class="heading-nav" href="{{ path('app_shop') }}"> SHOP</a>
             <a class="heading-nav" href="{{ path('app_shop', {filter: 'best_sellers'}) }}">BEST SELLERS</a>
@@ -20,4 +24,32 @@
                 <a class="heading-nav" id="heading-cta-button" href="{{ path('app_shop') }}">Shop Now</a>
             {% endif %}
         </nav>
+        <div class="nav-backdrop" aria-hidden="true"></div>
 </header>
+<script>
+    (function () {
+        var header = document.querySelector('header');
+        var toggle = header ? header.querySelector('.nav-toggle') : null;
+        if (!toggle) { return; }
+
+        function setOpen(open) {
+            header.classList.toggle('nav-open', open);
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        }
+
+        toggle.addEventListener('click', function () {
+            setOpen(!header.classList.contains('nav-open'));
+        });
+
+        // picking a destination closes the drawer
+        header.querySelectorAll('nav a.heading-nav').forEach(function (link) {
+            link.addEventListener('click', function () { setOpen(false); });
+        });
+
+        // tapping the dimmed page closes it too
+        var backdrop = header.querySelector('.nav-backdrop');
+        if (backdrop) {
+            backdrop.addEventListener('click', function () { setOpen(false); });
+        }
+    })();
+</script>

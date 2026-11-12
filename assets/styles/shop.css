@@ -305,3 +305,23 @@
     border: 1px solid #fca5a5;
     color: #991b1b;
 }
+
+/* ==========================================================================
+   MOBILE — the checkout button floats bottom-right like an app action button
+   ========================================================================== */
+@media (max-width: 768px) {
+    .shop-checkout-btn {
+        position: fixed;
+        right: 16px;
+        bottom: calc(32px + env(safe-area-inset-bottom, 0px));
+        z-index: 900;
+        border-radius: 999px;
+        padding: 14px 24px;
+        box-shadow: 0 12px 28px rgba(43, 80, 46, 0.35);
+    }
+
+    .shop-checkout-btn[disabled],
+    .shop-checkout-btn:disabled {
+        box-shadow: none;
+    }
+}

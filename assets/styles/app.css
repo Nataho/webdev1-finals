@@ -140,6 +140,12 @@ header h1 {
     background-color: var(--palette-light-green);
 }
 
+/* the mobile drawer chrome — hidden entirely on desktop */
+.nav-toggle,
+.nav-backdrop {
+    display: none;
+}
+
 /* Banner & Extra Image Container (shared) */
 .hero-image-container,
 .extra-image-container,
@@ -698,6 +704,47 @@ footer {
 }
 
 @media (max-width: 768px) {
+    /* home page: the three card rows stack so nothing squeezes to ~115px wide */
+    .photo-container,
+    .concern-container,
+    .feedback-container {
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    /* banners: the overlay text sits inside the (shorter) image instead of
+       overflowing it — tighter insets, smaller type, a taller image for room */
+    .hero-image-container img,
+    .extra-image-container img,
+    .about-us-image-container img,
+    .banner-image-container img {
+        min-height: 280px;
+    }
+
+    .overlay-content {
+        left: 24px;
+        right: 24px;
+        max-width: none;
+    }
+
+    .overlay-content h1 {
+        font-size: 1.5rem;
+    }
+
+    .overlay-content.center {
+        left: 16px;
+        right: 16px;
+        transform: translateY(-50%);
+    }
+
+    .overlay-content.center h1 {
+        font-size: 1.7rem;
+    }
+
+    .overlay-content.center p {
+        font-size: 0.95rem;
+    }
+
     .profile-section,
     .spotlight-section,
     .owner-section {
@@ -719,6 +766,112 @@ footer {
         border-left: none;
         border-top: 2px solid rgba(131, 162, 126, 0.3);
         padding-top: 14px;
+    }
+
+    /* site header: brand + hamburger on one row; the nav becomes a slide-in drawer */
+    header {
+        flex-direction: row;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 12px 4%;
+    }
+
+    header h1 {
+        font-size: 1.15rem;
+    }
+
+    .nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        width: 42px;
+        height: 42px;
+        background: transparent;
+        border: 1.5px solid rgba(249, 245, 236, 0.55);
+        border-radius: 10px;
+        color: var(--palette-dirty-white);
+        font-size: 1.15rem;
+        cursor: pointer;
+    }
+
+    .nav-toggle .fa-xmark {
+        display: none;
+    }
+
+    header.nav-open .nav-toggle .fa-bars {
+        display: none;
+    }
+
+    header.nav-open .nav-toggle .fa-xmark {
+        display: inline;
+    }
+
+    /* the off-canvas drawer */
+    header nav {
+        position: fixed;
+        top: 0;
+        right: -300px;
+        width: min(78vw, 300px);
+        height: 100vh;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+        padding: 74px 16px 24px 16px;
+        background-color: var(--palette-dark-green);
+        box-shadow: -14px 0 34px rgba(0, 0, 0, 0.28);
+        transition: right 0.28s ease;
+        overflow-y: auto;
+        z-index: 1200;
+    }
+
+    header.nav-open nav {
+        right: 0;
+    }
+
+    header.nav-open .nav-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background-color: rgba(20, 35, 22, 0.55);
+        z-index: 1100;
+    }
+
+    .heading-nav {
+        display: block;
+        padding: 12px 14px;
+        font-size: 0.95rem;
+        border-radius: 10px;
+    }
+
+    #heading-cta-button {
+        margin-top: 10px;
+        text-align: center;
+    }
+
+    /* footer: brand stacks above the link columns, which wrap to fit */
+    .footer-container {
+        flex-direction: column;
+        gap: 22px;
+        text-align: center;
+    }
+
+    .footer-brand {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .footer-links {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px 32px;
+    }
+
+    .footer-column {
+        text-align: center;
     }
 }
 

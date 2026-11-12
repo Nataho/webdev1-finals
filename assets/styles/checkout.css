@@ -12,7 +12,9 @@
 
 .checkout-grid {
     display: grid;
-    grid-template-columns: 1fr 380px;
+    /* minmax(0, 1fr), not bare 1fr — same latent overflow pattern as the
+       account grid: pins the column so wide content scrolls, never blows out */
+    grid-template-columns: minmax(0, 1fr) 380px;
     gap: 32px;
     align-items: start;
 }
@@ -570,7 +572,7 @@
 /* Responsive & Print Rules */
 @media (max-width: 860px) {
     .checkout-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     .cart-item-row {
         flex-wrap: wrap;

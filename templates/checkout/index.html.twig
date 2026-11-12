@@ -130,13 +130,13 @@
                     {% if addresses is not empty %}
                         <div id="saved_addresses_list">
                             {% for addr in addresses %}
-                                <label class="checkout-address-card {{ addr.is_default ? 'selected' : '' }}" style="display: block; cursor: pointer;">
+                                <label class="checkout-address-card {{ addr.isDefault ? 'selected' : '' }}" style="display: block; cursor: pointer;">
                                     <div style="display: flex; align-items: flex-start; gap: 8px;">
-                                        <input type="radio" name="checkout_address_id" value="{{ addr.address_id }}" {{ addr.is_default ? 'checked' : '' }} onchange="selectDeliveryAddress(this.value)" style="margin-top: 3px; accent-color: var(--palette-dark-green);">
+                                        <input type="radio" name="checkout_address_id" value="{{ addr.id }}" {{ addr.isDefault ? 'checked' : '' }} onchange="selectDeliveryAddress(this.value)" style="margin-top: 3px; accent-color: var(--palette-dark-green);">
                                         <div style="flex: 1;">
-                                            <strong>{{ addr.label|default('Home') }} · {{ addr.recipient_name }}</strong>
-                                            <div style="color: #555; font-size: 0.8rem;">{{ addr.street_address }}, Brgy. {{ addr.barangay }}, {{ addr.city }}, {{ addr.region }}</div>
-                                            <div style="color: var(--palette-gray); font-size: 0.75rem;">Phone: {{ addr.phone_number }}</div>
+                                            <strong>{{ addr.label|default('Home') }} · {{ addr.recipientName }}</strong>
+                                            <div style="color: #555; font-size: 0.8rem;">{{ addr.streetAddress }}, Brgy. {{ addr.barangay }}, {{ addr.city }}, {{ addr.region }}</div>
+                                            <div style="color: var(--palette-gray); font-size: 0.75rem;">Phone: {{ addr.phoneNumber }}</div>
                                         </div>
                                     </div>
                                 </label>
@@ -294,7 +294,7 @@
         gcash_number: '',
         card_number: '',
         save_payment_method: '1',
-        selected_address_id: (addresses is not empty ? (addresses|filter(a => a.is_default)|first.address_id|default(addresses|first.address_id)) : '0'),
+        selected_address_id: (addresses is not empty ? (addresses|filter(a => a.isDefault)|first.id|default(addresses|first.id)) : '0'),
         recipient_name: '',
         recipient_phone: '',
         region: '',

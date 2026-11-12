@@ -44,53 +44,53 @@
                         <tr>
                             <td>
                                 <div class="table-user-cell">
-                                    <strong>{{ u.user_name }}</strong>
-                                    {% if u.user_id == user.id %}
+                                    <strong>{{ u.username }}</strong>
+                                    {% if u.id == user.id %}
                                         <span class="badge-mini you">You</span>
                                     {% endif %}
                                 </div>
                             </td>
-                            <td><span class="cell-email" title="{{ u.user_email }}">{{ u.user_email|middle_truncate }}</span></td>
+                            <td><span class="cell-email" title="{{ u.email }}">{{ u.email|middle_truncate }}</span></td>
                             <td>
-                                {% if u.user_role == "banned"%}
+                                {% if u.role == "banned"%}
                                     <span class="badge-status banned"><i class="fa-solid fa-ban"></i> Banned</span>
-                                {% elseif u.user_role == "staff" %}
+                                {% elseif u.role == "staff" %}
                                     <span class="badge-status staff"><i class="fa-solid fa-user-gear"></i> Staff</span>
-                                {% elseif u.user_role == "admin" %}
+                                {% elseif u.role == "admin" %}
                                     <span class="badge-status admin"><i class="fa-solid fa-shield-halved"></i> Admin</span>
                                 {% else %}
                                     <span class="badge-status active"><i class="fa-solid fa-circle-check"></i> Customer</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if u.user_created_at %}
-                                    {{ u.user_created_at|date('M d, Y') }}
+                                {% if u.createdAt %}
+                                    {{ u.createdAt|date('M d, Y') }}
                                 {% else %}
                                     <span style="color: var(--palette-gray);" title="Created before this column was tracked">—</span>
                                 {% endif %}
                             </td>
                             <td style="text-align: right;">
-                                {% if u.user_id != user.id %}
+                                {% if u.id != user.id %}
                                     <div style="display: inline-flex; gap: 6px; align-items: center;">
                                         {# edit opens the prefilled modal — the row's data feeds prepareEditUser() #}
                                         <button type="button" class="table-btn-action primary" title="Edit User"
-                                                data-user-id="{{ u.user_id }}" data-user-name="{{ u.user_name }}"
-                                                data-user-email="{{ u.user_email }}" data-user-role="{{ u.user_role }}"
+                                                data-user-id="{{ u.id }}" data-user-name="{{ u.username }}"
+                                                data-user-email="{{ u.email }}" data-user-role="{{ u.role }}"
                                                 onclick="prepareEditUser(this)">
                                             <i class="fa-solid fa-user-pen"></i> Edit
                                         </button>
 
-                                        {% if u.user_role != "admin" %}
-                                            <button type="button" class="table-btn-action danger" title="Delete User" onclick="prepareDeleteUser({{ u.user_id }})">
+                                        {% if u.role != "admin" %}
+                                            <button type="button" class="table-btn-action danger" title="Delete User" onclick="prepareDeleteUser({{ u.id }})">
                                                 <i class="fa-solid fa-trash"></i> Delete
                                             </button>
                                         {% endif %}
 
-                                        {% if u.user_role == "banned" %}
+                                        {% if u.role == "banned" %}
                                             <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
                                                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
                                                 <input type="hidden" name="action" value="toggle_user_ban">
-                                                <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
+                                                <input type="hidden" name="target_user_id" value="{{ u.id }}">
                                                 <input type="hidden" name="target_action" value="unban">
                                                 <button type="submit" class="table-btn-action success" title="Unban User">
                                                     <i class="fa-solid fa-unlock"></i> Unban
@@ -100,7 +100,7 @@
                                             <form method="POST" action="{{ path('app_account', { tab: 'users' }) }}" style="display: inline;">
                                                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('toggle_user_ban') }}">
                                                 <input type="hidden" name="action" value="toggle_user_ban">
-                                                <input type="hidden" name="target_user_id" value="{{ u.user_id }}">
+                                                <input type="hidden" name="target_user_id" value="{{ u.id }}">
                                                 <input type="hidden" name="target_action" value="ban">
                                                 <button type="submit" class="table-btn-action danger" title="Ban User">
                                                     <i class="fa-solid fa-ban"></i> Ban

@@ -109,6 +109,16 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    /* the header pins to the viewport top while the page scrolls under it */
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+/* hash targets scroll to just below the sticky header */
+.faq-section,
+#fifth-heading {
+    scroll-margin-top: 80px;
 }
 
 header h1 {

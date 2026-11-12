@@ -38,25 +38,25 @@
             <tbody>
                 {% if admin_products_list is defined and admin_products_list|length > 0 %}
                     {% for prod in admin_products_list %}
-                        {% set qty = prod.product_stock_quantity|number_format %}
+                        {% set qty = prod.productStockQuantity|number_format %}
                         {% set stock_badge_class = qty <= 0 ? 'stock-out' : (qty <= 5 ? 'stock-low' : 'stock-ok') %}
                         {% set stock_badge_text = qty <= 0 ? 'Out of stock' : (qty <= 5 ? 'Low stock' : 'In stock') %}
-                        {% set can_manage = is_granted('ROLE_ADMIN') or prod.product_created_by == app.user.id %}
+                        {% set can_manage = is_granted('ROLE_ADMIN') or (prod.createdBy and prod.createdBy.id == app.user.id) %}
                         <tr>
                             <td>
                                 <div class="table-prod-name">
-                                    <strong>{{ prod.product_name }}</strong>
+                                    <strong>{{ prod.productName }}</strong>
                                     <span class="stock-pill {{ stock_badge_class }}">{{ stock_badge_text }}</span>
                                 </div>
                             </td>
-                            <td>₱{{ prod.product_price|number_format(2) }}</td>
+                            <td>₱{{ prod.productPrice|number_format(2) }}</td>
                             <td>
                                 <strong style="font-size: 1.05rem;">{{ qty }}</strong> <span style="font-size: 0.8rem; color: #888;">units</span>
                             </td>
                             <td>
-                                {% if prod.product_created_by_name %}
-                                    {{ prod.product_created_by_name }}
-                                    {% if prod.product_created_by == app.user.id %}<span style="font-size: 0.8rem; color: #888;">(you)</span>{% endif %}
+                                {% if prod.createdBy %}
+                                    {{ prod.createdBy.username }}
+                                    {% if prod.createdBy.id == app.user.id %}<span style="font-size: 0.8rem; color: #888;">(you)</span>{% endif %}
                                 {% else %}
                                     <span style="color: #888;">—</span>
                                 {% endif %}
@@ -65,23 +65,23 @@
                                 {% if can_manage %}
                                     <div style="display: inline-flex; gap: 6px; justify-content: flex-end; align-items: center;">
                                         <button type="button" class="table-btn-action" title="Edit Product" onclick="prepareEditProduct(this)"
-                                            data-product-id="{{ prod.product_id }}"
-                                            data-product-name="{{ prod.product_name }}"
-                                            data-product-price="{{ prod.product_price }}"
-                                            data-product-description="{{ prod.product_description|e('html_attr') }}"
-                                            data-product-img="{{ prod.product_img }}">
+                                            data-product-id="{{ prod.id }}"
+                                            data-product-name="{{ prod.productName }}"
+                                            data-product-price="{{ prod.productPrice }}"
+                                            data-product-description="{{ prod.productDescription|e('html_attr') }}"
+                                            data-product-img="{{ prod.productImg }}">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
                                         <form method="POST" action="{{ path('app_account', { tab: 'stock' }) }}" class="stock-update-form" style="display: inline-flex; gap: 6px; align-items: center;">
                                             <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_stock') }}">
                                             <input type="hidden" name="action" value="update_stock">
-                                            <input type="hidden" name="product_id" value="{{ prod.product_id }}">
+                                            <input type="hidden" name="product_id" value="{{ prod.id }}">
                                             <input type="number" name="new_stock" value="{{ qty }}" data-initial="{{ qty }}" min="0" step="1" required class="stock-input">
                                             <button type="submit" class="table-btn-action primary" title="Save Stock" disabled>
                                                 <i class="fa-solid fa-check"></i> Save
                                             </button>
                                         </form>
-                                        <button type="button" class="table-btn-action danger" title="Delete Product" onclick="prepareDeleteProduct({{ prod.product_id }})">
+                                        <button type="button" class="table-btn-action danger" title="Delete Product" onclick="prepareDeleteProduct({{ prod.id }})">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </div>

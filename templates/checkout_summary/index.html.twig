@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Order #{{ '%05d'|format(order.order_id) }} Summary | Estrera Botanicals{% endblock %}
+{% block title %}Order #{{ '%05d'|format(order.id) }} Summary | Estrera Botanicals{% endblock %}
 {% block body_class %}account-page{% endblock %}
 
 {% block javascripts %}
@@ -28,7 +28,7 @@
         <div class="panel-header-row" style="margin-bottom: 24px;">
             <div>
                 <h2 style="font-family: var(--heading-font); color: var(--palette-dark-green); font-size: 1.8rem; margin: 0 0 6px 0;">
-                    Order #{{ '%05d'|format(order.order_id) }}
+                    Order #{{ '%05d'|format(order.id) }}
                 </h2>
                 <p class="subtext" style="margin: 0;">Official purchase record &amp; checkout summary</p>
             </div>
@@ -39,28 +39,28 @@
         <div class="order-meta-grid">
             <div class="order-meta-item">
                 <label>Order Date</label>
-                <span>{{ order.order_date ? order.order_date|date('M d, Y · h:i A') : '' }}</span>
+                <span>{{ order.orderDate ? order.orderDate|date('M d, Y · h:i A') : '' }}</span>
             </div>
             <div class="order-meta-item">
                 <label>Customer Name</label>
-                <span>{{ order.user_name|default('User') }}</span>
+                <span>{{ order.user.username|default('User') }}</span>
             </div>
             <div class="order-meta-item">
                 <label>Customer Email</label>
-                <span style="font-size: 0.9rem; font-weight: 500;">{{ order.user_email|default('N/A') }}</span>
+                <span style="font-size: 0.9rem; font-weight: 500;">{{ order.user.email|default('N/A') }}</span>
             </div>
             <div class="order-meta-item">
                 <label>Payment Method</label>
                 <span>
-                    {% if order.payment_method == 'gcash' %}
+                    {% if order.paymentMethod == 'gcash' %}
                         <i class="fa-solid fa-mobile-screen-button"></i> GCash
-                        {% set gcash_detail = (order.payment_details is defined and order.payment_details) ? order.payment_details : (order.gcash_number is defined and order.gcash_number ? order.gcash_number : (app.user.gcashNumber|default(''))) %}
+                        {% set gcash_detail = order.paymentDetails ?: app.user.gcashNumber|default('') %}
                         {% if gcash_detail %}
                             <span style="font-weight: 500; color: #406040; margin-left: 4px;">({{ gcash_detail }})</span>
                         {% endif %}
-                    {% elseif order.payment_method == 'card' %}
+                    {% elseif order.paymentMethod == 'card' %}
                         <i class="fa-solid fa-credit-card"></i> Credit / Debit Card
-                        {% set card_detail = (order.payment_details is defined and order.payment_details) ? order.payment_details : (order.card_number is defined and order.card_number ? order.card_number : (app.user.cardNumber|default('') ? '•••• •••• •••• ' ~ app.user.cardNumber|slice(-4) : '')) %}
+                        {% set card_detail = order.paymentDetails ?: (app.user.cardNumber ? '•••• •••• •••• ' ~ app.user.cardNumber|slice(-4) : '') %}
                         {% if card_detail %}
                             <span style="font-weight: 500; color: #406040; margin-left: 4px;">({{ card_detail }})</span>
                         {% endif %}
@@ -76,19 +76,19 @@
             <div class="order-meta-item" style="grid-column: 1 / -1; border-top: 1px dashed #d8e2d7; padding-top: 10px; margin-top: 2px;">
                 <label><i class="fa-solid fa-location-dot" style="color: var(--palette-light-green);"></i> Delivery Address</label>
                 <span style="font-weight: 500; color: #2d3748;">
-                    {{ (order.delivery_address is defined and order.delivery_address) ? order.delivery_address : 'Standard Delivery Destination' }}
-                    {% if (order.recipient_name is defined and order.recipient_name) or (order.recipient_phone is defined and order.recipient_phone) %}
+                    {{ order.deliveryAddress ?: 'Standard Delivery Destination' }}
+                    {% if order.recipientName or order.recipientPhone %}
                         <span style="display: block; font-size: 0.85rem; color: var(--palette-gray); margin-top: 2px;">
-                            Recipient: <strong>{{ order.recipient_name is defined and order.recipient_name ? order.recipient_name : order.user_name|default('User') }}</strong>
-                            {% if order.recipient_phone is defined and order.recipient_phone %} · {{ order.recipient_phone }}{% endif %}
+                            Recipient: <strong>{{ order.recipientName ?: order.user.username|default('User') }}</strong>
+                            {% if order.recipientPhone %} · {{ order.recipientPhone }}{% endif %}
                         </span>
                     {% endif %}
                 </span>
             </div>
-            {% if (order.status|default(''))|lower == 'cancelled' and (order.cancel_reason is defined and order.cancel_reason) %}
+            {% if order.status|lower == 'cancelled' and order.cancelReason %}
                 <div class="order-meta-item" style="grid-column: 1 / -1; border-top: 1px dashed #d8e2d7; padding-top: 10px; margin-top: 2px;">
                     <label><i class="fa-solid fa-circle-exclamation" style="color: #b91c1c;"></i> Cancellation Reason</label>
-                    <span style="font-weight: 500; color: #7f1d1d;">&ldquo;{{ order.cancel_reason }}&rdquo;</span>
+                    <span style="font-weight: 500; color: #7f1d1d;">&ldquo;{{ order.cancelReason }}&rdquo;</span>
                 </div>
             {% endif %}
         </div>
@@ -106,15 +106,15 @@
                 </thead>
                 <tbody>
                     {% for item in items %}
-                        {% set row_img = item.image_url|default(false) ? asset(item.image_url) : asset('images/3.png') %}
+                        {% set row_img = item.product.imageUrl ? asset(item.product.imageUrl) : asset('images/3.png') %}
                         <tr>
                             <td>
                                 <img src="{{ row_img }}" alt="" class="summary-table-thumb">
-                                <strong>{{ item.product_name|default('Product #' ~ item.product_id) }}</strong>
+                                <strong>{{ item.product.productName }}</strong>
                             </td>
-                            <td style="text-align: center;">₱{{ item.price_at_purchase|number_format(2) }}</td>
+                            <td style="text-align: center;">₱{{ item.priceAtPurchase|number_format(2) }}</td>
                             <td style="text-align: center; font-weight: 700;">{{ item.quantity }}</td>
-                            <td style="text-align: right; font-weight: 700;">₱{{ (item.price_at_purchase * item.quantity)|number_format(2) }}</td>
+                            <td style="text-align: right; font-weight: 700;">₱{{ (item.priceAtPurchase * item.quantity)|number_format(2) }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -125,7 +125,7 @@
         <div class="summary-totals-box">
             <div class="summary-totals-row">
                 <span>Subtotal:</span>
-                <strong>₱{{ order.total_amount|number_format(2) }}</strong>
+                <strong>₱{{ order.totalAmount|number_format(2) }}</strong>
             </div>
             <div class="summary-totals-row">
                 <span>Shipping:</span>
@@ -133,7 +133,7 @@
             </div>
             <div class="summary-totals-row grand">
                 <span>Grand Total:</span>
-                <span>₱{{ order.total_amount|number_format(2) }}</span>
+                <span>₱{{ order.totalAmount|number_format(2) }}</span>
             </div>
         </div>
 

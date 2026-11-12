@@ -21,13 +21,13 @@
     {% else %}
         <div style="display: flex; flex-direction: column; gap: 14px; margin-top: 14px;">
             {% for addr in addresses %}
-                <div style="padding: 18px 20px; background: #ffffff; border: 1.5px solid {{ addr.is_default ? 'var(--palette-light-green)' : '#e2e8e2' }}; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); position: relative; transition: all 0.2s ease;">
+                <div style="padding: 18px 20px; background: #ffffff; border: 1.5px solid {{ addr.isDefault ? 'var(--palette-light-green)' : '#e2e8e2' }}; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); position: relative; transition: all 0.2s ease;">
                     <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px;">
                         <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                             <span style="font-weight: 700; color: var(--palette-dark-green); font-size: 1rem;">
                                 {{ addr.label|default('Home') }}
                             </span>
-                            {% if addr.is_default %}
+                            {% if addr.isDefault %}
                                 <span class="badge-status active" style="font-size: 0.72rem; padding: 3px 8px;">
                                     <i class="fa-solid fa-circle-check"></i> Default
                                 </span>
@@ -36,10 +36,10 @@
 
                         <!-- Action controls -->
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            {% if not addr.is_default %}
+                            {% if not addr.isDefault %}
                                 <form method="POST" action="{{ path('app_account') }}" style="margin: 0;">
                                     <input type="hidden" name="action" value="set_default_address">
-                                    <input type="hidden" name="address_id" value="{{ addr.address_id }}">
+                                    <input type="hidden" name="address_id" value="{{ addr.id }}">
                                     <input type="hidden" name="_csrf_token" value="{{ csrf_token('set_default_address') }}">
                                     <button type="submit" class="account-btn secondary" style="padding: 4px 10px; font-size: 0.8rem;" title="Set as default delivery address">
                                         Set as Default
@@ -47,13 +47,27 @@
                                 </form>
                             {% endif %}
 
-                            <button type="button" class="account-btn secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick='openEditAddressModal({{ addr|json_encode|e('html_attr') }})'>
+                            {# the modal prefill reads the same snake_case keys as before, fed from the entity here #}
+                            {% set addr_json = {
+                                address_id: addr.id,
+                                label: addr.label,
+                                recipient_name: addr.recipientName,
+                                phone_number: addr.phoneNumber,
+                                region: addr.region,
+                                province: addr.province,
+                                city: addr.city,
+                                barangay: addr.barangay,
+                                postal_code: addr.postalCode,
+                                street_address: addr.streetAddress,
+                                is_default: addr.isDefault,
+                            } %}
+                            <button type="button" class="account-btn secondary" style="padding: 4px 10px; font-size: 0.8rem;" onclick='openEditAddressModal({{ addr_json|json_encode|e('html_attr') }})'>
                                 <i class="fa-solid fa-pen-to-square"></i> Edit
                             </button>
 
                             <form method="POST" action="{{ path('app_account') }}" onsubmit="return confirm('Are you sure you want to delete this address?');" style="margin: 0;">
                                 <input type="hidden" name="action" value="delete_address">
-                                <input type="hidden" name="address_id" value="{{ addr.address_id }}">
+                                <input type="hidden" name="address_id" value="{{ addr.id }}">
                                 <input type="hidden" name="_csrf_token" value="{{ csrf_token('delete_address') }}">
                                 <button type="submit" class="account-btn secondary" style="padding: 4px 8px; font-size: 0.8rem; color: #b91c1c; border-color: #fca5a5;" title="Delete Address">
                                     <i class="fa-solid fa-trash-can"></i>
@@ -64,13 +78,13 @@
 
                     <div style="font-size: 0.95rem; color: #2d3748; line-height: 1.5;">
                         <div style="font-weight: 600; margin-bottom: 2px;">
-                            {{ addr.recipient_name }}
+                            {{ addr.recipientName }}
                             <span style="font-weight: 400; color: var(--palette-gray); margin-left: 10px; font-size: 0.88rem;">
-                                <i class="fa-solid fa-phone" style="font-size: 0.8rem;"></i> {{ addr.phone_number }}
+                                <i class="fa-solid fa-phone" style="font-size: 0.8rem;"></i> {{ addr.phoneNumber }}
                             </span>
                         </div>
                         <div style="color: #4a5568; font-size: 0.9rem;">
-                            {{ addr.street_address }}, Brgy. {{ addr.barangay }}, {{ addr.city }}, {{ addr.province ? addr.province ~ ', ' : '' }}{{ addr.region }}{{ addr.postal_code ? ' ' ~ addr.postal_code : '' }}
+                            {{ addr.streetAddress }}, Brgy. {{ addr.barangay }}, {{ addr.city }}, {{ addr.province ? addr.province ~ ', ' : '' }}{{ addr.region }}{{ addr.postalCode ? ' ' ~ addr.postalCode : '' }}
                         </div>
                     </div>
                 </div>

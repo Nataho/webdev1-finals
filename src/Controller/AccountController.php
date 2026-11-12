@@ -2,10 +2,15 @@
 
 namespace App\Controller;
 
+use App\Entity\Address;
 use App\Entity\Order;
+use App\Entity\Product;
 use App\Entity\User;
+use App\Repository\AddressRepository;
+use App\Repository\OrderRepository;
+use App\Repository\ProductRepository;
+use App\Repository\UserRepository;
 use App\Service\FileUploader;
-use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use RuntimeException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -42,8 +47,11 @@ final class AccountController extends AbstractController
     ];
 
     public function __construct(
-        private readonly Connection $connection,
         private readonly EntityManagerInterface $entityManager,
+        private readonly UserRepository $userRepository,
+        private readonly ProductRepository $productRepository,
+        private readonly OrderRepository $orderRepository,
+        private readonly AddressRepository $addressRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly FileUploader $fileUploader,
     ) {
@@ -110,24 +118,20 @@ final class AccountController extends AbstractController
         }
 
         // fetch user delivery addresses
-        $addresses = $this->connection->fetchAllAssociative(
-            'SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, address_id DESC',
-            [$user->getId()]
+        $addresses = $this->addressRepository->findBy(
+            ['user' => $user],
+            ['isDefault' => 'DESC', 'id' => 'DESC']
         );
 
         // fetch data for the dashboard tab (admin only)
         $users_count = $staff_count = $products_count = $orders_count = 0;
         $recent_orders = [];
         if ($isAdmin) {
-            $users_count = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM users');
-            $staff_count = (int) $this->connection->fetchOne("SELECT COUNT(*) FROM users WHERE user_role = 'staff'");
-            $products_count = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM products');
-            $orders_count = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM orders');
-            $recent_orders = $this->connection->fetchAllAssociative(
-                'SELECT o.*, u.user_name, u.user_email
-                FROM orders o LEFT JOIN users u ON o.user_id = u.user_id
-                ORDER BY o.order_date DESC LIMIT 5'
-            );
+            $users_count = $this->userRepository->count([]);
+            $staff_count = $this->userRepository->countByRole('staff');
+            $products_count = $this->productRepository->count([]);
+            $orders_count = $this->orderRepository->count([]);
+            $recent_orders = $this->orderRepository->findRecent(5);
         }
 
         // fetch data for the logs tab
@@ -143,36 +147,11 @@ final class AccountController extends AbstractController
 
             if ($isAdmin || $isStaff) {
                 // admins and staff both see the full store order log; only admins may change statuses
-                $sql = 'SELECT o.*, u.user_name, u.user_email FROM orders o LEFT JOIN users u ON o.user_id = u.user_id';
-                $params = [];
-                if ($status_filter !== null) {
-                    $sql .= ' WHERE o.status = ?';
-                    $params[] = $status_filter;
-                }
-                $orders_list = $this->connection->fetchAllAssociative($sql.' ORDER BY o.order_date DESC', $params);
-
-                $count_rows = $this->connection->fetchAllAssociative(
-                    'SELECT status, COUNT(*) AS total FROM orders GROUP BY status'
-                );
+                $orders_list = $this->orderRepository->listAll($status_filter);
+                $status_counts = $this->orderRepository->countByStatus();
             } else {
-                $sql = 'SELECT * FROM orders WHERE user_id = ?';
-                $params = [$user->getId()];
-                if ($status_filter !== null) {
-                    $sql .= ' AND status = ?';
-                    $params[] = $status_filter;
-                }
-                $orders_list = $this->connection->fetchAllAssociative($sql.' ORDER BY order_date DESC', $params);
-
-                $count_rows = $this->connection->fetchAllAssociative(
-                    'SELECT status, COUNT(*) AS total FROM orders WHERE user_id = ? GROUP BY status',
-                    [$user->getId()]
-                );
-            }
-
-            // turn the counts into a status => total map (statuses with zero orders are just absent)
-            $status_counts = [];
-            foreach ($count_rows as $row) {
-                $status_counts[$row['status']] = (int) $row['total'];
+                $orders_list = $this->orderRepository->listForUser($user, $status_filter);
+                $status_counts = $this->orderRepository->countByStatus($user);
             }
         }
 
@@ -180,42 +159,14 @@ final class AccountController extends AbstractController
         $user_q = trim($request->query->getString('user_q'));
         $admin_users_list = [];
         if ($active_tab === 'users' && $isAdmin) {
-            if ($user_q !== '') {
-                $searchTerm = '%'.$user_q.'%';
-                $admin_users_list = $this->connection->fetchAllAssociative(
-                    'SELECT user_id, user_name, user_email, user_role, user_profile_pic, user_created_at
-                    FROM users
-                    WHERE user_name LIKE ? OR user_email LIKE ?
-                    ORDER BY user_id DESC',
-                    [$searchTerm, $searchTerm]
-                );
-            } else {
-                $admin_users_list = $this->connection->fetchAllAssociative(
-                    'SELECT user_id, user_name, user_email, user_role, user_profile_pic, user_created_at
-                    FROM users
-                    ORDER BY user_id DESC'
-                );
-            }
+            $admin_users_list = $this->userRepository->searchAll($user_q !== '' ? '%'.$user_q.'%' : '');
         }
 
         // fetch data for the stock tab (admins and staff share the catalog view)
         $stock_q = trim($request->query->getString('stock_q'));
         $admin_products_list = [];
         if ($active_tab === 'stock' && ($isAdmin || $isStaff)) {
-            if ($stock_q !== '') {
-                $admin_products_list = $this->connection->fetchAllAssociative(
-                    'SELECT p.*, u.user_name AS product_created_by_name
-                    FROM products p LEFT JOIN users u ON u.user_id = p.product_created_by
-                    WHERE p.product_name LIKE ? ORDER BY p.product_id DESC',
-                    ['%'.$stock_q.'%']
-                );
-            } else {
-                $admin_products_list = $this->connection->fetchAllAssociative(
-                    'SELECT p.*, u.user_name AS product_created_by_name
-                    FROM products p LEFT JOIN users u ON u.user_id = p.product_created_by
-                    ORDER BY p.product_id DESC'
-                );
-            }
+            $admin_products_list = $this->productRepository->searchAll($stock_q !== '' ? '%'.$stock_q.'%' : '');
         }
 
         return $this->render('account/index.html.twig', [
@@ -336,7 +287,7 @@ final class AccountController extends AbstractController
 
         $old_pic = $user->getProfilePic();
         $user->setProfilePic($filename);
-        $this->connection->executeStatement('UPDATE users SET user_profile_pic = ? WHERE user_id = ?', [$filename, $user->getId()]);
+        $this->entityManager->flush();
 
         if ($old_pic) {
             $this->fileUploader->delete('avatars', $old_pic);
@@ -363,18 +314,14 @@ final class AccountController extends AbstractController
             return $redirect();
         }
 
-        $existing = (int) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM users WHERE user_name = ? AND user_id != ?',
-            [$new_username, $user->getId()]
-        );
-        if ($existing > 0) {
+        if ($this->userRepository->countByUsernameExcept($new_username, $user->getId()) > 0) {
             $this->addFlash('error', 'That username is already taken. Please choose another.');
 
             return $redirect();
         }
 
         $user->setUsername($new_username);
-        $this->connection->executeStatement('UPDATE users SET user_name = ? WHERE user_id = ?', [$new_username, $user->getId()]);
+        $this->entityManager->flush();
         $this->addFlash('success', 'Username updated successfully!');
 
         return $redirect();
@@ -406,7 +353,7 @@ final class AccountController extends AbstractController
 
         $hashed = $this->passwordHasher->hashPassword($user, $new);
         $user->setPassword($hashed);
-        $this->connection->executeStatement('UPDATE users SET user_password = ? WHERE user_id = ?', [$hashed, $user->getId()]);
+        $this->entityManager->flush();
         $this->addFlash('success', 'Password updated successfully!');
 
         return $redirect();
@@ -424,7 +371,8 @@ final class AccountController extends AbstractController
         }
 
         $old_pic = $user->getProfilePic();
-        $this->connection->executeStatement('DELETE FROM users WHERE user_id = ?', [$user->getId()]);
+        $this->entityManager->remove($user);
+        $this->entityManager->flush();
 
         if ($old_pic) {
             $this->fileUploader->delete('avatars', $old_pic);
@@ -445,28 +393,23 @@ final class AccountController extends AbstractController
             return $redirect(['tab' => 'users']);
         }
 
-        $row = $this->connection->fetchAssociative(
-            'SELECT user_id, user_role FROM users WHERE user_id = ?',
-            [$target_id]
-        );
+        $target = $this->userRepository->find($target_id);
 
-        if (!$row) {
+        if (!$target instanceof User) {
             $this->addFlash('error', 'User not found.');
 
             return $redirect(['tab' => 'users']);
         }
 
-        if ('admin' === $row['user_role']) {
+        if ($target->getRole() === 'admin') {
             $this->addFlash('error', 'Administrators cannot be banned.');
 
             return $redirect(['tab' => 'users']);
         }
 
-        $new_role = ('banned' === $row['user_role']) ? 'customer' : 'banned';
-        $this->connection->executeStatement(
-            'UPDATE users SET user_role = ? WHERE user_id = ?',
-            [$new_role, $target_id]
-        );
+        $new_role = $target->isBanned() ? 'customer' : 'banned';
+        $target->setRole($new_role);
+        $this->entityManager->flush();
 
         $this->addFlash('success', 'banned' === $new_role ? 'User has been banned.' : 'User has been unbanned.');
 
@@ -514,20 +457,14 @@ final class AccountController extends AbstractController
             return $redirect($tab);
         }
 
-        $email_taken = (int) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM users WHERE user_email = ?',
-            [$email]
-        );
+        $email_taken = $this->userRepository->countByEmailExcept($email);
         if ($email_taken > 0) {
             $this->addFlash('error', 'An account with that email already exists.');
 
             return $redirect($tab);
         }
 
-        $name_taken = (int) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM users WHERE user_name = ?',
-            [$name]
-        );
+        $name_taken = $this->userRepository->countByUsernameExcept($name);
         if ($name_taken > 0) {
             $this->addFlash('error', 'That username is already taken. Please choose another.');
 
@@ -537,10 +474,13 @@ final class AccountController extends AbstractController
         // hash through the entity so the auto hasher picks the right algorithm
         $hashed = $this->passwordHasher->hashPassword(new User(), $password);
 
-        $this->connection->executeStatement(
-            'INSERT INTO users (user_name, user_email, user_password, user_role) VALUES (?, ?, ?, ?)',
-            [$name, $email, $hashed, $role]
-        );
+        $account = (new User())
+            ->setUsername($name)
+            ->setEmail($email)
+            ->setRole($role)
+            ->setPassword($hashed);
+        $this->entityManager->persist($account);
+        $this->entityManager->flush();
 
         $this->addFlash('success', ucfirst($role)." account '{$name}' has been created.");
 
@@ -558,12 +498,9 @@ final class AccountController extends AbstractController
             return $redirect($tab);
         }
 
-        $row = $this->connection->fetchAssociative(
-            'SELECT user_id, user_name, user_email, user_role FROM users WHERE user_id = ?',
-            [$target_id]
-        );
+        $target = $this->userRepository->find($target_id);
 
-        if (!$row) {
+        if (!$target instanceof User) {
             $this->addFlash('error', 'User not found.');
 
             return $redirect($tab);
@@ -571,12 +508,12 @@ final class AccountController extends AbstractController
 
         $name = trim($request->getPayload()->getString('edit_user_name'));
         $email = trim($request->getPayload()->getString('edit_user_email'));
-        $role = $request->getPayload()->getString('edit_user_role', $row['user_role']);
+        $role = $request->getPayload()->getString('edit_user_role', (string) $target->getRole());
         $new_password = $request->getPayload()->getString('edit_user_password');
 
         // a ban is a deliberate moderation action, not a role: editing a banned
         // account never silently lifts it — the Unban button is the only path out
-        $is_banned_target = 'banned' === $row['user_role'];
+        $is_banned_target = $target->isBanned();
         if ($is_banned_target) {
             $role = 'banned';
         }
@@ -606,26 +543,20 @@ final class AccountController extends AbstractController
         }
 
         // an admin changing their own role could lock themselves out of the admin area
-        if ($target_id === $currentUser->getId() && $role !== $row['user_role']) {
+        if ($target_id === $currentUser->getId() && $role !== $target->getRole()) {
             $this->addFlash('error', 'You cannot change your own role.');
 
             return $redirect($tab);
         }
 
-        $email_taken = (int) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM users WHERE user_email = ? AND user_id != ?',
-            [$email, $target_id]
-        );
+        $email_taken = $this->userRepository->countByEmailExcept($email, $target_id);
         if ($email_taken > 0) {
             $this->addFlash('error', 'An account with that email already exists.');
 
             return $redirect($tab);
         }
 
-        $name_taken = (int) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM users WHERE user_name = ? AND user_id != ?',
-            [$name, $target_id]
-        );
+        $name_taken = $this->userRepository->countByUsernameExcept($name, $target_id);
         if ($name_taken > 0) {
             $this->addFlash('error', 'That username is already taken. Please choose another.');
 
@@ -633,24 +564,20 @@ final class AccountController extends AbstractController
         }
 
         // empty password field = keep the current password
-        $hashed = '' !== $new_password ? $this->passwordHasher->hashPassword(new User(), $new_password) : null;
+        $reset_password = '' !== $new_password;
 
-        if (null !== $hashed) {
-            $this->connection->executeStatement(
-                'UPDATE users SET user_name = ?, user_email = ?, user_role = ?, user_password = ? WHERE user_id = ?',
-                [$name, $email, $role, $hashed, $target_id]
-            );
-        } else {
-            $this->connection->executeStatement(
-                'UPDATE users SET user_name = ?, user_email = ?, user_role = ? WHERE user_id = ?',
-                [$name, $email, $role, $target_id]
-            );
+        $target->setUsername($name);
+        $target->setEmail($email);
+        $target->setRole($role);
+        if ($reset_password) {
+            $target->setPassword($this->passwordHasher->hashPassword(new User(), $new_password));
         }
+        $this->entityManager->flush();
 
         $this->addFlash(
             'success',
             "User '{$name}' has been updated."
-            .(null !== $hashed ? ' Their password has been reset.' : '')
+            .($reset_password ? ' Their password has been reset.' : '')
             .($is_banned_target ? ' Ban status is unchanged.' : '')
         );
 
@@ -676,38 +603,32 @@ final class AccountController extends AbstractController
             return $redirect($tab);
         }
 
-        $row = $this->connection->fetchAssociative(
-            'SELECT user_id, user_name, user_role, user_profile_pic FROM users WHERE user_id = ?',
-            [$target_id]
-        );
+        $target = $this->userRepository->find($target_id);
 
-        if (!$row) {
+        if (!$target instanceof User) {
             $this->addFlash('error', 'User not found.');
 
             return $redirect($tab);
         }
 
         // mirror the ban guard: admin accounts are untouchable by other admins
-        if ('admin' === $row['user_role']) {
+        if ($target->getRole() === 'admin') {
             $this->addFlash('error', 'Administrator accounts cannot be deleted.');
 
             return $redirect($tab);
         }
 
-        $affected = $this->connection->executeStatement(
-            'DELETE FROM users WHERE user_id = ?',
-            [$target_id]
-        );
+        $old_pic = $target->getProfilePic();
+        $target_name = $target->getUsername();
 
-        if ($affected > 0) {
-            if ($row['user_profile_pic']) {
-                $this->fileUploader->delete('avatars', $row['user_profile_pic']);
-            }
+        $this->entityManager->remove($target);
+        $this->entityManager->flush();
 
-            $this->addFlash('success', "User '{$row['user_name']}' has been permanently deleted.");
-        } else {
-            $this->addFlash('error', 'Failed to delete user or user not found.');
+        if ($old_pic) {
+            $this->fileUploader->delete('avatars', $old_pic);
         }
+
+        $this->addFlash('success', "User '{$target_name}' has been permanently deleted.");
 
         return $redirect($tab);
     }
@@ -729,10 +650,12 @@ final class AccountController extends AbstractController
             return $redirect(['tab' => 'stock']);
         }
 
-        $this->connection->executeStatement(
-            'UPDATE products SET product_stock_quantity = ? WHERE product_id = ?',
-            [$new_stock, $product_id]
-        );
+        $product = $this->productRepository->find($product_id);
+        if ($product instanceof Product) {
+            $product->setProductStockQuantity($new_stock);
+            $this->entityManager->flush();
+        }
+
         $this->addFlash('success', 'Stock level updated successfully!');
 
         return $redirect(['tab' => 'stock']);
@@ -764,10 +687,16 @@ final class AccountController extends AbstractController
             }
         }
 
-        $this->connection->executeStatement(
-            'INSERT INTO products (product_name, product_description, product_price, product_stock_quantity, product_img, product_created_by) VALUES (?, ?, ?, ?, ?, ?)',
-            [$p_name, $p_desc, $p_price, $p_stock, $p_img, $user->getId()]
-        );
+        $product = (new Product())
+            ->setProductName($p_name)
+            ->setProductDescription($p_desc)
+            ->setProductPrice(number_format($p_price, 2, '.', ''))
+            ->setProductStockQuantity($p_stock)
+            ->setProductImg($p_img)
+            ->setCreatedBy($user);
+        $this->entityManager->persist($product);
+        $this->entityManager->flush();
+
         $this->addFlash('success', "Product '{$p_name}' added to store inventory!");
 
         return $redirect(['tab' => 'stock']);
@@ -789,16 +718,18 @@ final class AccountController extends AbstractController
             return $redirect(['tab' => 'stock']);
         }
 
-        $affected = $this->connection->executeStatement(
-            'DELETE FROM products WHERE product_id = ?',
-            [$product_id]
-        );
+        $product = $this->productRepository->find($product_id);
 
-        if ($affected > 0) {
-            $this->addFlash('success', 'Product has been permanently deleted.');
-        } else {
+        if (!$product instanceof Product) {
             $this->addFlash('error', 'Failed to delete product or product not found.');
+
+            return $redirect(['tab' => 'stock']);
         }
+
+        $this->entityManager->remove($product);
+        $this->entityManager->flush();
+
+        $this->addFlash('success', 'Product has been permanently deleted.');
 
         return $redirect(['tab' => 'stock']);
     }
@@ -823,17 +754,16 @@ final class AccountController extends AbstractController
             return $redirect(['tab' => 'stock']);
         }
 
-        $product = $this->connection->fetchAssociative(
-            'SELECT product_img FROM products WHERE product_id = ?',
-            [$product_id]
-        );
-        if (false === $product) {
+        $product = $this->productRepository->find($product_id);
+
+        if (!$product instanceof Product) {
             $this->addFlash('error', 'Failed to edit product or product not found.');
 
             return $redirect(['tab' => 'stock']);
         }
 
-        $p_img = (string) ($product['product_img'] ?? '');
+        $old_img = (string) $product->getProductImg();
+        $p_img = $old_img;
 
         // optional replacement image
         $file = $request->files->get('product_image');
@@ -847,16 +777,17 @@ final class AccountController extends AbstractController
             }
 
             // drop the replaced file so the uploads folder stays clean
-            $old_img = (string) ($product['product_img'] ?? '');
             if ('' !== $old_img && $old_img !== $p_img) {
                 $this->fileUploader->delete('products', $old_img);
             }
         }
 
-        $this->connection->executeStatement(
-            'UPDATE products SET product_name = ?, product_description = ?, product_price = ?, product_img = ? WHERE product_id = ?',
-            [$p_name, $p_desc, $p_price, $p_img, $product_id]
-        );
+        $product->setProductName($p_name);
+        $product->setProductDescription($p_desc);
+        $product->setProductPrice(number_format($p_price, 2, '.', ''));
+        $product->setProductImg($p_img);
+        $this->entityManager->flush();
+
         $this->addFlash('success', "Product '{$p_name}' has been updated.");
 
         return $redirect(['tab' => 'stock']);
@@ -871,12 +802,10 @@ final class AccountController extends AbstractController
             return true;
         }
 
-        $owner_id = $this->connection->fetchOne(
-            'SELECT product_created_by FROM products WHERE product_id = ?',
-            [$product_id]
-        );
+        $product = $this->productRepository->find($product_id);
 
-        return false !== $owner_id && null !== $owner_id && (int) $owner_id === $user->getId();
+        return $product instanceof Product
+            && $product->getCreatedBy()?->getId() === $user->getId();
     }
 
     private function updatePaymentOptions(Request $request, User $user, \Closure $redirect): Response
@@ -891,7 +820,7 @@ final class AccountController extends AbstractController
                 return $redirect(['tab' => 'payment_options']);
             }
             $user->setGcashNumber($number);
-            $this->connection->executeStatement('UPDATE users SET gcash_number = ? WHERE user_id = ?', [$number, $user->getId()]);
+            $this->entityManager->flush();
             $this->addFlash('success', 'GCash account updated successfully.');
         } elseif ($payment_type === 'card') {
             $number = trim($request->getPayload()->getString('card_number'));
@@ -903,7 +832,7 @@ final class AccountController extends AbstractController
                 return $redirect(['tab' => 'payment_options']);
             }
             $user->setCardNumber($clean_number);
-            $this->connection->executeStatement('UPDATE users SET card_number = ? WHERE user_id = ?', [$clean_number, $user->getId()]);
+            $this->entityManager->flush();
             $this->addFlash('success', 'Card details updated successfully.');
         } else {
             $this->addFlash('error', 'Invalid payment option type.');
@@ -918,11 +847,11 @@ final class AccountController extends AbstractController
 
         if ($payment_type === 'gcash') {
             $user->setGcashNumber(null);
-            $this->connection->executeStatement('UPDATE users SET gcash_number = NULL WHERE user_id = ?', [$user->getId()]);
+            $this->entityManager->flush();
             $this->addFlash('success', 'GCash account removed.');
         } elseif ($payment_type === 'card') {
             $user->setCardNumber(null);
-            $this->connection->executeStatement('UPDATE users SET card_number = NULL WHERE user_id = ?', [$user->getId()]);
+            $this->entityManager->flush();
             $this->addFlash('success', 'Card details removed.');
         }
 
@@ -949,29 +878,30 @@ final class AccountController extends AbstractController
         }
 
         // if user has no addresses yet, make this one default
-        $count = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM user_addresses WHERE user_id = ?', [$user->getId()]);
-        if ($count === 0 || $is_default) {
+        $is_first = $this->addressRepository->count(['user' => $user]) === 0;
+        if ($is_first || $is_default) {
             $is_default = true;
-            $this->connection->executeStatement('UPDATE user_addresses SET is_default = 0 WHERE user_id = ?', [$user->getId()]);
+
+            // demote every existing address first
+            foreach ($this->addressRepository->findBy(['user' => $user]) as $existing) {
+                $existing->setIsDefault(false);
+            }
         }
 
-        $this->connection->executeStatement(
-            'INSERT INTO user_addresses (user_id, label, recipient_name, phone_number, region, province, city, barangay, postal_code, street_address, is_default)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [
-                $user->getId(),
-                $label ?: 'Home',
-                $recipient_name,
-                $phone_number,
-                $region,
-                $province ?: null,
-                $city,
-                $barangay,
-                $postal_code ?: null,
-                $street_address,
-                $is_default ? 1 : 0,
-            ]
-        );
+        $address = (new Address())
+            ->setUser($user)
+            ->setLabel($label ?: 'Home')
+            ->setRecipientName($recipient_name)
+            ->setPhoneNumber($phone_number)
+            ->setRegion($region)
+            ->setProvince($province ?: null)
+            ->setCity($city)
+            ->setBarangay($barangay)
+            ->setPostalCode($postal_code ?: null)
+            ->setStreetAddress($street_address)
+            ->setIsDefault($is_default);
+        $this->entityManager->persist($address);
+        $this->entityManager->flush();
 
         $this->addFlash('success', 'New delivery address added successfully.');
 
@@ -992,12 +922,9 @@ final class AccountController extends AbstractController
         $street_address = trim($request->getPayload()->getString('street_address'));
         $is_default = $request->getPayload()->getBoolean('is_default');
 
-        $exists = (int) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM user_addresses WHERE address_id = ? AND user_id = ?',
-            [$address_id, $user->getId()]
-        );
+        $address = $this->addressRepository->findOneBy(['id' => $address_id, 'user' => $user]);
 
-        if (!$exists) {
+        if (!$address instanceof Address) {
             $this->addFlash('error', 'Address not found or unauthorized.');
 
             return $redirect(['tab' => 'addresses']);
@@ -1010,30 +937,23 @@ final class AccountController extends AbstractController
         }
 
         if ($is_default) {
-            $this->connection->executeStatement('UPDATE user_addresses SET is_default = 0 WHERE user_id = ?', [$user->getId()]);
+            // demote every other address first
+            foreach ($this->addressRepository->findBy(['user' => $user]) as $existing) {
+                $existing->setIsDefault(false);
+            }
         }
 
-        $this->connection->executeStatement(
-            'UPDATE user_addresses SET
-                label = ?, recipient_name = ?, phone_number = ?, region = ?,
-                province = ?, city = ?, barangay = ?, postal_code = ?,
-                street_address = ?, is_default = ?
-            WHERE address_id = ? AND user_id = ?',
-            [
-                $label ?: 'Home',
-                $recipient_name,
-                $phone_number,
-                $region,
-                $province ?: null,
-                $city,
-                $barangay,
-                $postal_code ?: null,
-                $street_address,
-                $is_default ? 1 : 0,
-                $address_id,
-                $user->getId(),
-            ]
-        );
+        $address->setLabel($label ?: 'Home')
+            ->setRecipientName($recipient_name)
+            ->setPhoneNumber($phone_number)
+            ->setRegion($region)
+            ->setProvince($province ?: null)
+            ->setCity($city)
+            ->setBarangay($barangay)
+            ->setPostalCode($postal_code ?: null)
+            ->setStreetAddress($street_address)
+            ->setIsDefault($is_default);
+        $this->entityManager->flush();
 
         $this->addFlash('success', 'Delivery address updated successfully.');
 
@@ -1044,34 +964,28 @@ final class AccountController extends AbstractController
     {
         $address_id = (int) $request->getPayload()->getString('address_id');
 
-        $is_default = (int) $this->connection->fetchOne(
-            'SELECT is_default FROM user_addresses WHERE address_id = ? AND user_id = ?',
-            [$address_id, $user->getId()]
-        );
+        $address = $this->addressRepository->findOneBy(['id' => $address_id, 'user' => $user]);
 
-        $deleted = $this->connection->executeStatement(
-            'DELETE FROM user_addresses WHERE address_id = ? AND user_id = ?',
-            [$address_id, $user->getId()]
-        );
-
-        if ($deleted > 0) {
-            // if we deleted the default address, set another remaining address as default if one exists
-            if ($is_default) {
-                $other_id = $this->connection->fetchOne(
-                    'SELECT address_id FROM user_addresses WHERE user_id = ? ORDER BY address_id DESC LIMIT 1',
-                    [$user->getId()]
-                );
-                if ($other_id) {
-                    $this->connection->executeStatement(
-                        'UPDATE user_addresses SET is_default = 1 WHERE address_id = ?',
-                        [$other_id]
-                    );
-                }
-            }
-            $this->addFlash('success', 'Address deleted successfully.');
-        } else {
+        if (!$address instanceof Address) {
             $this->addFlash('error', 'Failed to delete address.');
+
+            return $redirect(['tab' => 'addresses']);
         }
+
+        $was_default = $address->isDefault();
+        $this->entityManager->remove($address);
+        $this->entityManager->flush();
+
+        // if we deleted the default address, set another remaining address as default if one exists
+        if ($was_default) {
+            $other = $this->addressRepository->findOneBy(['user' => $user], ['id' => 'DESC']);
+            if ($other instanceof Address) {
+                $other->setIsDefault(true);
+                $this->entityManager->flush();
+            }
+        }
+
+        $this->addFlash('success', 'Address deleted successfully.');
 
         return $redirect(['tab' => 'addresses']);
     }
@@ -1080,14 +994,16 @@ final class AccountController extends AbstractController
     {
         $address_id = (int) $request->getPayload()->getString('address_id');
 
-        $exists = (int) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM user_addresses WHERE address_id = ? AND user_id = ?',
-            [$address_id, $user->getId()]
-        );
+        $address = $this->addressRepository->findOneBy(['id' => $address_id, 'user' => $user]);
 
-        if ($exists) {
-            $this->connection->executeStatement('UPDATE user_addresses SET is_default = 0 WHERE user_id = ?', [$user->getId()]);
-            $this->connection->executeStatement('UPDATE user_addresses SET is_default = 1 WHERE address_id = ? AND user_id = ?', [$address_id, $user->getId()]);
+        if ($address instanceof Address) {
+            // demote every address, then promote the chosen one
+            foreach ($this->addressRepository->findBy(['user' => $user]) as $existing) {
+                $existing->setIsDefault(false);
+            }
+            $address->setIsDefault(true);
+            $this->entityManager->flush();
+
             $this->addFlash('success', 'Default delivery address updated.');
         } else {
             $this->addFlash('error', 'Address not found.');
@@ -1113,18 +1029,15 @@ final class AccountController extends AbstractController
             return $redirect(['tab' => 'logs']);
         }
 
-        $order = $this->connection->fetchAssociative(
-            'SELECT status FROM orders WHERE order_id = ? LIMIT 1',
-            [$order_id]
-        );
+        $order = $this->orderRepository->find($order_id);
 
-        if (!$order) {
+        if (!$order instanceof Order) {
             $this->addFlash('error', 'Order not found; status not updated.');
 
             return $redirect(['tab' => 'logs']);
         }
 
-        $previous_status = (string) $order['status'];
+        $previous_status = (string) $order->getStatus();
 
         if ($previous_status === $new_status) {
             $this->addFlash('error', 'This order already has that status.');
@@ -1132,37 +1045,30 @@ final class AccountController extends AbstractController
             return $redirect(['tab' => 'logs']);
         }
 
-        // status flip and the stock hand-back commit (or roll back) together
+        // the status flip and the stock hand-back commit together — one flush
+        // is one transaction, and the shortage check below bails before it
         try {
-            $this->connection->beginTransaction();
-
-            $this->connection->executeStatement(
-                'UPDATE orders SET status = ? WHERE order_id = ?',
-                [$new_status, $order_id]
-            );
-
             // cancelling returns the reserved items to the shelf, re-opening an
             // already cancelled order takes them back out — atomically either way
             $returning_to_cancelled = 'cancelled' === $new_status && 'cancelled' !== $previous_status;
             $leaving_the_cancelled_bin = 'cancelled' !== $new_status && 'cancelled' === $previous_status;
 
             if ($returning_to_cancelled) {
-                $stock_moved = $this->adjustStockForOrder($order_id, 'restock');
+                $stock_moved = $this->adjustStockForOrder($order, 'restock');
             } elseif ($leaving_the_cancelled_bin) {
-                $stock_moved = $this->adjustStockForOrder($order_id, 'reserve');
+                $stock_moved = $this->adjustStockForOrder($order, 'reserve');
             } else {
                 $stock_moved = true;
             }
 
             if (!$stock_moved) {
-                $this->connection->rollBack();
-
+                // in-memory changes are discarded — nothing was flushed
                 return $redirect(['tab' => 'logs']);
             }
 
-            $this->connection->commit();
+            $order->setStatus($new_status);
+            $this->entityManager->flush();
         } catch (\Throwable) {
-            $this->rollBackQuietly();
             $this->addFlash('error', 'Something went wrong while updating this order. Please try again.');
 
             return $redirect(['tab' => 'logs']);
@@ -1184,18 +1090,15 @@ final class AccountController extends AbstractController
         }
 
         // only the order's owner may cancel it
-        $order = $this->connection->fetchAssociative(
-            'SELECT status, user_id FROM orders WHERE order_id = ? LIMIT 1',
-            [$order_id]
-        );
+        $order = $this->orderRepository->find($order_id);
 
-        if (!$order || (int) $order['user_id'] !== $user->getId()) {
+        if (!$order instanceof Order || $order->getUser()?->getId() !== $user->getId()) {
             $this->addFlash('error', 'Order not found or not yours to cancel.');
 
             return $redirect(['tab' => 'logs']);
         }
 
-        if (!in_array((string) $order['status'], Order::CANCELLABLE_STATUSES, true)) {
+        if (!in_array((string) $order->getStatus(), Order::CANCELLABLE_STATUSES, true)) {
             $message = in_array('pending', Order::CANCELLABLE_STATUSES, true)
                 ? 'This order is already being processed and can no longer be cancelled. Please contact us if you still want it withdrawn.'
                 : 'This order can no longer be cancelled.';
@@ -1213,24 +1116,18 @@ final class AccountController extends AbstractController
             return $redirect(['tab' => 'logs']);
         }
 
-        // the status flip and the stock hand-back commit (or roll back) together
+        // the status flip and the stock hand-back commit together — one flush
         try {
-            $this->connection->beginTransaction();
+            $order->setStatus('cancelled');
+            $order->setCancelReason($cancel_reason);
 
-            $this->connection->executeStatement(
-                "UPDATE orders SET status = 'cancelled', cancel_reason = ? WHERE order_id = ?",
-                [$cancel_reason, $order_id]
-            );
-
-            if (!$this->adjustStockForOrder($order_id, 'restock')) {
-                $this->connection->rollBack();
-
+            if (!$this->adjustStockForOrder($order, 'restock')) {
+                // in-memory changes are discarded — nothing was flushed
                 return $redirect(['tab' => 'logs']);
             }
 
-            $this->connection->commit();
+            $this->entityManager->flush();
         } catch (\Throwable) {
-            $this->rollBackQuietly();
             $this->addFlash('error', 'Something went wrong while cancelling this order. Please try again.');
 
             return $redirect(['tab' => 'logs']);
@@ -1246,54 +1143,38 @@ final class AccountController extends AbstractController
      * 'restock' puts the items back (cancellation),
      * 'reserve' takes them out again (admin re-opens a cancelled order).
      * Legacy orders that predate the checkout transaction never reserved stock;
-     * a set payment method is the marker for that, so this skips them.
+     * a missing payment method is the marker for that, so this skips them.
+     * The changes only become permanent when the caller flushes.
      */
-    private function adjustStockForOrder(int $order_id, string $direction): bool
+    private function adjustStockForOrder(Order $order, string $direction): bool
     {
         $direction = in_array($direction, ['restock', 'reserve'], true) ? $direction : 'restock';
 
         // only checkout-placed orders have reservations to move around
-        $reserved_at_checkout = (int) $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM orders WHERE order_id = ? AND payment_method IS NOT NULL',
-            [$order_id]
-        );
-
-        if (0 === $reserved_at_checkout) {
+        if ($order->getPaymentMethod() === null) {
             return true;
         }
 
         // re-reserving must never push the shelf below zero (the guard checkout applies too)
         if ('reserve' === $direction) {
-            $shortage = (int) $this->connection->fetchOne(
-                'SELECT COUNT(*) FROM order_items oi
-                 JOIN products p ON p.product_id = oi.product_id
-                 WHERE oi.order_id = ? AND p.product_stock_quantity < oi.quantity',
-                [$order_id]
-            );
+            foreach ($order->getOrderItems() as $item) {
+                if ($item->getProduct()->getProductStockQuantity() < $item->getQuantity()) {
+                    $this->addFlash('error', 'Not enough stock on the shelf to move this order out of cancelled — some items have to be reserved again.');
 
-            if ($shortage > 0) {
-                $this->addFlash('error', 'Not enough stock on the shelf to move this order out of cancelled — some items have to be reserved again.');
-
-                return false;
+                    return false;
+                }
             }
         }
 
-        $symbol = 'restock' === $direction ? '+' : '-';
-        $this->connection->executeStatement(
-            "UPDATE products p
-             JOIN order_items oi ON oi.product_id = p.product_id
-             SET p.product_stock_quantity = p.product_stock_quantity {$symbol} oi.quantity
-             WHERE oi.order_id = ?",
-            [$order_id]
-        );
+        foreach ($order->getOrderItems() as $item) {
+            $product = $item->getProduct();
+            $product->setProductStockQuantity(
+                'restock' === $direction
+                    ? $product->getProductStockQuantity() + $item->getQuantity()
+                    : $product->getProductStockQuantity() - $item->getQuantity()
+            );
+        }
 
         return true;
-    }
-
-    private function rollBackQuietly(): void
-    {
-        if ($this->connection->isTransactionActive()) {
-            $this->connection->rollBack();
-        }
     }
 }

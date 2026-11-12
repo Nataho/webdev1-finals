@@ -66,36 +66,36 @@
                     {% for order in orders_list %}
                         <tr>
                             <td>
-                                <strong>#{{ '%05d'|format(order.order_id) }}</strong>
+                                <strong>#{{ '%05d'|format(order.id) }}</strong>
                             </td>
                             {% if is_granted("ROLE_STAFF") %}
                                 <td>
                                     <div>
-                                        <strong>{{ order.user_name|default('Unknown') }}</strong>
-                                        <div class="cell-email" title="{{ order.user_email|default('') }}" style="font-size: 0.8rem; color: var(--palette-gray);">{{ (order.user_email|default(''))|middle_truncate }}</div>
+                                        <strong>{{ order.user.username|default('Unknown') }}</strong>
+                                        <div class="cell-email" title="{{ order.user.email|default('') }}" style="font-size: 0.8rem; color: var(--palette-gray);">{{ (order.user.email|default(''))|middle_truncate }}</div>
                                     </div>
                                 </td>
                             {% endif %}
                             <td>
-                                {{ order.order_date|date('M d, Y · h:i A') }}
+                                {{ order.orderDate|date('M d, Y · h:i A') }}
                             </td>
                             <td>
-                                <strong>₱{{ order.total_amount|number_format(2) }}</strong>
+                                <strong>₱{{ order.totalAmount|number_format(2) }}</strong>
                             </td>
                             <td>
                                 {% set badge_attrs = '' %}
-                                {% if (order.status|default(''))|lower == 'cancelled' and order.cancel_reason|default('') %}
-                                    {% set badge_attrs = 'title="Cancellation reason: ' ~ order.cancel_reason|e('html_attr') ~ '"' %}
+                                {% if order.status|lower == 'cancelled' and order.cancelReason %}
+                                    {% set badge_attrs = 'title="Cancellation reason: ' ~ order.cancelReason|e('html_attr') ~ '"' %}
                                 {% endif %}
                                 {{ badge(order.status, badge_attrs) }}
                             </td>
                             <td style="text-align: right;">
                                 <div class="status-action-stack">
-                                    <a href="{{ path('app_checkout_summary', { order_id: order.order_id }) }}" class="table-btn-action primary" style="text-decoration: none; display: inline-flex;" title="View Order Summary">
+                                    <a href="{{ path('app_checkout_summary', { order_id: order.id }) }}" class="table-btn-action primary" style="text-decoration: none; display: inline-flex;" title="View Order Summary">
                                         <i class="fa-solid fa-file-invoice"></i> View Summary
                                     </a>
-                                    {% if not is_granted('ROLE_ADMIN') and order.user_id|default(0) == app.user.id and (order.status|default('pending'))|lower in constant('App\\Entity\\Order::CANCELLABLE_STATUSES') %}
-                                        <button type="button" class="table-btn-action danger" onclick="prepareCancelOrder({{ order.order_id }})" title="Cancel this pending order">
+                                    {% if not is_granted('ROLE_ADMIN') and order.user.id == app.user.id and order.status|lower in constant('App\\Entity\\Order::CANCELLABLE_STATUSES') %}
+                                        <button type="button" class="table-btn-action danger" onclick="prepareCancelOrder({{ order.id }})" title="Cancel this pending order">
                                             <i class="fa-solid fa-xmark"></i> Cancel
                                         </button>
                                     {% endif %}
@@ -103,10 +103,10 @@
                                         <form method="post" action="{{ path('app_account', { tab: 'logs' }) }}" class="status-update-form">
                                             <input type="hidden" name="action" value="update_order_status">
                                             <input type="hidden" name="_csrf_token" value="{{ csrf_token('update_order_status') }}">
-                                            <input type="hidden" name="order_id" value="{{ order.order_id }}">
-                                            <select name="new_status" aria-label="New status for order #{{ '%05d'|format(order.order_id) }}">
+                                            <input type="hidden" name="order_id" value="{{ order.id }}">
+                                            <select name="new_status" aria-label="New status for order #{{ '%05d'|format(order.id) }}">
                                                 {% for status_option in constant('App\\Entity\\Order::STATUSES') %}
-                                                    <option value="{{ status_option }}" {{ status_option|lower == (order.status|default('pending'))|lower ? 'selected' : '' }}>{{ status_option|capitalize }}</option>
+                                                    <option value="{{ status_option }}" {{ status_option|lower == order.status|lower ? 'selected' : '' }}>{{ status_option|capitalize }}</option>
                                                 {% endfor %}
                                             </select>
                                             <button type="submit" class="table-btn-action primary" title="Apply the new status">

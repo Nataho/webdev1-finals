@@ -3,10 +3,8 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Repository\ProductRepository;
 use App\Service\FileUploader;
-use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\ParameterType;
-use RuntimeException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,7 +17,7 @@ final class ShopController extends AbstractController
     private const CSRF_ACTIONS = ['add_to_cart'];
 
     public function __construct(
-        private readonly Connection $connection,
+        private readonly ProductRepository $productRepository,
         private readonly FileUploader $fileUploader,
         #[Autowire(param: 'kernel.project_dir')]
         private readonly string $projectDir,
@@ -46,11 +44,11 @@ final class ShopController extends AbstractController
             $filter = 'all';
         }
 
-        $products = $this->fetchProducts($filter);
+        $products = $filter === 'best_sellers' ? $this->productRepository->findBestSellers() : $this->productRepository->findAllInStockFirst();
 
         // resolve each product image url server-side so the card stays dumb
-        foreach ($products as $i => $prod) {
-            $products[$i]['image_url'] = $this->resolveImageUrl($prod['product_img']);
+        foreach ($products as $product) {
+            $product->setImageUrl($this->resolveImageUrl($product->getProductImg()));
         }
 
         // compute total cart count
@@ -105,13 +103,10 @@ final class ShopController extends AbstractController
         }
 
         // check product stock
-        $prod = $this->connection->fetchAssociative(
-            'SELECT product_name, product_price, product_stock_quantity FROM products WHERE product_id = ? LIMIT 1',
-            [$product_id]
-        );
+        $product = $this->productRepository->find($product_id);
 
-        if ($prod && (int) $prod['product_stock_quantity'] > 0) {
-            $available_stock = (int) $prod['product_stock_quantity'];
+        if ($product && $product->getProductStockQuantity() > 0) {
+            $available_stock = $product->getProductStockQuantity();
 
             // prevent adding more than available stock
             if ($qty > $available_stock) {
@@ -130,42 +125,13 @@ final class ShopController extends AbstractController
             $cart[$product_id] = $new_total_qty;
             $session->set('cart', $cart);
 
-            $batch_total = (float) $prod['product_price'] * $qty;
-            $this->addFlash('success', "Added {$qty}x '{$prod['product_name']}' to your cart! (Batch Total: ₱".number_format($batch_total, 2).')');
+            $batch_total = (float) $product->getProductPrice() * $qty;
+            $this->addFlash('success', "Added {$qty}x '{$product->getProductName()}' to your cart! (Batch Total: ₱".number_format($batch_total, 2).')');
         } else {
             $this->addFlash('error', 'Sorry, this item is currently out of stock.');
         }
 
         return $this->redirectToRoute('app_shop');
-    }
-
-    // fetch products according to filter
-    private function fetchProducts(string $filter): array
-    {
-        if ($filter === 'best_sellers') {
-            // count total products to find 50% rounded up
-            $total_products_count = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM products');
-            $best_seller_limit = (int) ceil($total_products_count * 0.5);
-
-            // no products at all — nothing to rank
-            if ($best_seller_limit === 0) {
-                return [];
-            }
-
-            // fetch top 50% products ranked by total sold quantity, then alphabetical by name
-            return $this->connection->fetchAllAssociative('
-                SELECT p.*, COALESCE(SUM(oi.quantity), 0) AS total_sold
-                FROM products p
-                LEFT JOIN order_items oi ON p.product_id = oi.product_id
-                GROUP BY p.product_id
-                ORDER BY total_sold DESC, p.product_name ASC
-                LIMIT ?', [$best_seller_limit], [ParameterType::INTEGER]);
-        }
-
-        // fetch all products: in-stock first, out-of-stock at the very end
-        return $this->connection->fetchAllAssociative(
-            'SELECT * FROM products ORDER BY (product_stock_quantity > 0) DESC, product_id DESC'
-        );
     }
 
     // resolve a product image: uploaded file first, then the assets folder, else the 3.png placeholder

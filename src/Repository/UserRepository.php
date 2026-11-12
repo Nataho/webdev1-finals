@@ -49,11 +49,64 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getOneOrNullResult();
     }
 
-    // public function findAllUsers(): array
-    // {
-    //     return $this->createQueryBuilder('u')
-    //     ->orderBy('u.id', "DESC"),
-    //     ->getQuery()
-    //     ->getResult();
-    // }
+    /**
+     * Every account, newest first — narrowed to the search term when one is given.
+     *
+     * @return User[]
+     */
+    public function searchAll(string $searchTerm = ''): array
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->orderBy('u.id', 'DESC');
+
+        if ('' !== $searchTerm) {
+            $qb
+                ->where('u.username LIKE :term OR u.email LIKE :term')
+                ->setParameter('term', $searchTerm);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * How many accounts hold the given role (the dashboard's staff stat).
+     */
+    public function countByRole(string $role): int
+    {
+        return (int) $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('u.role = :role')
+            ->setParameter('role', $role)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * Uniqueness checks that leave one account out (the one being edited).
+     */
+    public function countByEmailExcept(string $email, ?int $exceptId = null): int
+    {
+        return $this->countExcept('email', $email, $exceptId);
+    }
+
+    public function countByUsernameExcept(string $username, ?int $exceptId = null): int
+    {
+        return $this->countExcept('username', $username, $exceptId);
+    }
+
+    private function countExcept(string $field, string $value, ?int $exceptId): int
+    {
+        $qb = $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where("u.$field = :value")
+            ->setParameter('value', $value);
+
+        if (null !== $exceptId) {
+            $qb
+                ->andWhere('u.id != :exceptId')
+                ->setParameter('exceptId', $exceptId);
+        }
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
 }

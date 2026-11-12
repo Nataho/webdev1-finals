@@ -61,6 +61,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: Address::class, mappedBy: 'user', orphanRemoval: true)]
     private Collection $addresses;
 
+    /**
+     * Read-only creation stamp — Doctrine never writes this column, so the
+     * table's CURRENT_TIMESTAMP default keeps timestamping every new account.
+     */
+    #[ORM\Column(name: 'user_created_at', insertable: false, updatable: false, nullable: true)]
+    private ?\DateTime $createdAt = null;
+
     public function __construct()
     {
         $this->orders = new ArrayCollection();
@@ -251,6 +258,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->cardNumber = $cardNumber;
 
         return $this;
+    }
+
+    public function getCreatedAt(): ?\DateTime
+    {
+        return $this->createdAt;
     }
 
     /**

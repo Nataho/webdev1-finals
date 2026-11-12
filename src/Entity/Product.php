@@ -30,6 +30,17 @@ class Product
     #[ORM\Column(length: 255)]
     private ?string $productImg = null;
 
+    /** Account that created the listing — staff may only manage their own products (batch 4). */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(name: 'product_created_by', referencedColumnName: 'user_id', nullable: true)]
+    private ?User $createdBy = null;
+
+    /**
+     * Resolved image URL — computed view data the controller decorates onto
+     * the entity before rendering; there is no such column, so it is not mapped.
+     */
+    private ?string $imageUrl = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -91,6 +102,30 @@ class Product
     public function setProductImg(string $productImg): static
     {
         $this->productImg = $productImg;
+
+        return $this;
+    }
+
+    public function getCreatedBy(): ?User
+    {
+        return $this->createdBy;
+    }
+
+    public function setCreatedBy(?User $createdBy): static
+    {
+        $this->createdBy = $createdBy;
+
+        return $this;
+    }
+
+    public function getImageUrl(): ?string
+    {
+        return $this->imageUrl;
+    }
+
+    public function setImageUrl(?string $imageUrl): static
+    {
+        $this->imageUrl = $imageUrl;
 
         return $this;
     }

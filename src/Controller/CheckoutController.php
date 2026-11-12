@@ -2,9 +2,14 @@
 
 namespace App\Controller;
 
+use App\Entity\Address;
+use App\Entity\Order;
+use App\Entity\OrderItem;
 use App\Entity\User;
+use App\Repository\AddressRepository;
+use App\Repository\ProductRepository;
 use App\Service\FileUploader;
-use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,7 +23,9 @@ final class CheckoutController extends AbstractController
     private const CSRF_ACTIONS = ['update_qty', 'remove_item', 'place_order'];
 
     public function __construct(
-        private readonly Connection $connection,
+        private readonly ProductRepository $productRepository,
+        private readonly AddressRepository $addressRepository,
+        private readonly EntityManagerInterface $entityManager,
         private readonly FileUploader $fileUploader,
         #[Autowire(param: 'kernel.project_dir')]
         private readonly string $projectDir,
@@ -48,9 +55,9 @@ final class CheckoutController extends AbstractController
         [$cart_items, $subtotal] = $this->loadCart($request->getSession());
 
         // fetch user's saved addresses
-        $addresses = $this->connection->fetchAllAssociative(
-            'SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, address_id DESC',
-            [$user->getId()]
+        $addresses = $this->addressRepository->findBy(
+            ['user' => $user],
+            ['isDefault' => 'DESC', 'id' => 'DESC']
         );
 
         return $this->render('checkout/index.html.twig', [
@@ -104,10 +111,7 @@ final class CheckoutController extends AbstractController
                 $this->addFlash('success', 'Item removed from cart.');
             } else {
                 // verify stock
-                $stock = (int) $this->connection->fetchOne(
-                    'SELECT product_stock_quantity FROM products WHERE product_id = ?',
-                    [$product_id]
-                );
+                $stock = $this->productRepository->find($product_id)?->getProductStockQuantity() ?? 0;
 
                 if ($qty > $stock) {
                     $cart[$product_id] = $stock;
@@ -141,7 +145,7 @@ final class CheckoutController extends AbstractController
         return $this->redirectToRoute('app_checkout');
     }
 
-    // place the order: revalidate stock, then order + items + stock deduction in one transaction
+    // place the order: revalidate stock, then order + items + stock deduction in one flushed transaction
     private function placeOrder(Request $request, User $user): Response
     {
         $cart = $this->sessionCart($request->getSession());
@@ -154,15 +158,9 @@ final class CheckoutController extends AbstractController
 
         // fetch fresh product info and validate stock
         $pids = array_map('intval', array_keys($cart));
-        $placeholders = implode(',', array_fill(0, count($pids), '?'));
-        $fresh_products = $this->connection->fetchAllAssociative(
-            "SELECT product_id, product_name, product_price, product_stock_quantity FROM products WHERE product_id IN ($placeholders)",
-            $pids
-        );
-
         $products_by_id = [];
-        foreach ($fresh_products as $fp) {
-            $products_by_id[(int) $fp['product_id']] = $fp;
+        foreach ($this->productRepository->findBy(['id' => $pids]) as $product) {
+            $products_by_id[$product->getId()] = $product;
         }
 
         $order_items_to_save = [];
@@ -183,21 +181,21 @@ final class CheckoutController extends AbstractController
                 break;
             }
 
-            $pinfo = $products_by_id[$pid];
-            $current_stock = (int) $pinfo['product_stock_quantity'];
+            $product = $products_by_id[$pid];
+            $current_stock = $product->getProductStockQuantity();
 
             if ($qty > $current_stock) {
                 $stock_insufficient = true;
-                $insufficient_item_name = "Not enough stock for '{$pinfo['product_name']}' (Only {$current_stock} available).";
+                $insufficient_item_name = "Not enough stock for '{$product->getProductName()}' (Only {$current_stock} available).";
                 break;
             }
 
-            $unit_price = (float) $pinfo['product_price'];
+            $unit_price = (float) $product->getProductPrice();
             $line_total = $unit_price * $qty;
             $total_amount += $line_total;
 
             $order_items_to_save[] = [
-                'product_id' => $pid,
+                'product' => $product,
                 'quantity' => $qty,
                 'price_at_purchase' => $unit_price,
             ];
@@ -227,8 +225,9 @@ final class CheckoutController extends AbstractController
             }
             $payment_details = $gcash_num;
             if ($user->getGcashNumber() !== $gcash_num || $request->getPayload()->getBoolean('save_payment_method')) {
+                // persist through the entity
                 $user->setGcashNumber($gcash_num);
-                $this->connection->executeStatement('UPDATE users SET gcash_number = ? WHERE user_id = ?', [$gcash_num, $user->getId()]);
+                $this->entityManager->flush();
             }
         } elseif ($payment_method === 'card') {
             $submitted_card = trim($request->getPayload()->getString('card_number'));
@@ -242,7 +241,7 @@ final class CheckoutController extends AbstractController
             $payment_details = '•••• •••• •••• ' . substr($clean_card, -4);
             if ($user->getCardNumber() !== $clean_card || $request->getPayload()->getBoolean('save_payment_method')) {
                 $user->setCardNumber($clean_card);
-                $this->connection->executeStatement('UPDATE users SET card_number = ? WHERE user_id = ?', [$clean_card, $user->getId()]);
+                $this->entityManager->flush();
             }
         } else {
             $payment_details = 'Cash on Delivery';
@@ -256,22 +255,11 @@ final class CheckoutController extends AbstractController
         $recipient_phone = trim($request->getPayload()->getString('recipient_phone'));
 
         if ($address_id > 0) {
-            $saved_addr = $this->connection->fetchAssociative(
-                'SELECT * FROM user_addresses WHERE address_id = ? AND user_id = ?',
-                [$address_id, $user->getId()]
-            );
-            if ($saved_addr) {
-                $recipient_name = $saved_addr['recipient_name'];
-                $recipient_phone = $saved_addr['phone_number'];
-                $delivery_parts = array_filter([
-                    $saved_addr['street_address'],
-                    $saved_addr['barangay'] ? 'Brgy. ' . $saved_addr['barangay'] : null,
-                    $saved_addr['city'],
-                    $saved_addr['province'] && $saved_addr['province'] !== $saved_addr['city'] ? $saved_addr['province'] : null,
-                    $saved_addr['region'],
-                    $saved_addr['postal_code'],
-                ]);
-                $delivery_address = implode(', ', $delivery_parts);
+            $saved_addr = $this->addressRepository->findOneBy(['id' => $address_id, 'user' => $user]);
+            if ($saved_addr instanceof Address) {
+                $recipient_name = $saved_addr->getRecipientName();
+                $recipient_phone = $saved_addr->getPhoneNumber();
+                $delivery_address = $saved_addr->getFormattedAddress();
             }
         }
 
@@ -295,45 +283,35 @@ final class CheckoutController extends AbstractController
                 ]);
                 $delivery_address = implode(', ', $delivery_parts);
 
-                // optionally save to user_addresses
+                // optionally save to the user's address book
                 if ($request->getPayload()->getBoolean('save_address')) {
-                    $has_default = (int) $this->connection->fetchOne('SELECT COUNT(*) FROM user_addresses WHERE user_id = ?', [$user->getId()]);
-                    $this->connection->executeStatement(
-                        'INSERT INTO user_addresses (user_id, label, recipient_name, phone_number, region, province, city, barangay, postal_code, street_address, is_default)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                        [
-                            $user->getId(),
-                            'Home',
-                            $recipient_name ?: $user->getUsername(),
-                            $recipient_phone ?: 'N/A',
-                            $region ?: 'Metro Manila',
-                            $province ?: null,
-                            $city ?: 'Manila',
-                            $barangay ?: 'Central',
-                            $postal_code ?: null,
-                            $street ?: 'Address',
-                            $has_default === 0 ? 1 : 0,
-                        ]
+                    $has_default = $this->addressRepository->count(['user' => $user]);
+                    $this->entityManager->persist(
+                        (new Address())
+                            ->setUser($user)
+                            ->setLabel('Home')
+                            ->setRecipientName($recipient_name ?: $user->getUsername())
+                            ->setPhoneNumber($recipient_phone ?: 'N/A')
+                            ->setRegion($region ?: 'Metro Manila')
+                            ->setProvince($province ?: null)
+                            ->setCity($city ?: 'Manila')
+                            ->setBarangay($barangay ?: 'Central')
+                            ->setPostalCode($postal_code ?: null)
+                            ->setStreetAddress($street ?: 'Address')
+                            ->setIsDefault($has_default === 0)
                     );
+                    $this->entityManager->flush();
                 }
             } else {
                 // fall back to user's default saved address if available
-                $default_addr = $this->connection->fetchAssociative(
-                    'SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, address_id DESC LIMIT 1',
-                    [$user->getId()]
+                $default_addr = $this->addressRepository->findOneBy(
+                    ['user' => $user],
+                    ['isDefault' => 'DESC', 'id' => 'DESC']
                 );
-                if ($default_addr) {
-                    $recipient_name = $default_addr['recipient_name'];
-                    $recipient_phone = $default_addr['phone_number'];
-                    $delivery_parts = array_filter([
-                        $default_addr['street_address'],
-                        $default_addr['barangay'] ? 'Brgy. ' . $default_addr['barangay'] : null,
-                        $default_addr['city'],
-                        $default_addr['province'] && $default_addr['province'] !== $default_addr['city'] ? $default_addr['province'] : null,
-                        $default_addr['region'],
-                        $default_addr['postal_code'],
-                    ]);
-                    $delivery_address = implode(', ', $delivery_parts);
+                if ($default_addr instanceof Address) {
+                    $recipient_name = $default_addr->getRecipientName();
+                    $recipient_phone = $default_addr->getPhoneNumber();
+                    $delivery_address = $default_addr->getFormattedAddress();
                 }
             }
         }
@@ -342,48 +320,41 @@ final class CheckoutController extends AbstractController
             $recipient_name = $user->getUsername();
         }
 
-        // start database transaction
+        // order + items + stock deduction — one flush is one transaction
         try {
-            $this->connection->beginTransaction();
+            $order = (new Order())
+                ->setUser($user)
+                ->setTotalAmount(number_format($total_amount, 2, '.', ''))
+                ->setOrderDate(new \DateTime())
+                ->setStatus('pending')
+                ->setPaymentMethod($payment_method)
+                ->setPaymentDetails($payment_details)
+                ->setDeliveryAddress($delivery_address)
+                ->setRecipientName($recipient_name)
+                ->setRecipientPhone($recipient_phone);
 
-            // insert order
-            $this->connection->executeStatement(
-                "INSERT INTO orders (user_id, total_amount, order_date, status, payment_method, payment_details, delivery_address, recipient_name, recipient_phone) VALUES (?, ?, NOW(), 'pending', ?, ?, ?, ?, ?)",
-                [
-                    $user->getId(),
-                    number_format($total_amount, 2, '.', ''),
-                    $payment_method,
-                    $payment_details,
-                    $delivery_address,
-                    $recipient_name,
-                    $recipient_phone,
-                ]
-            );
-            $order_id = (int) $this->connection->lastInsertId();
-
-            // insert every line item and deduct the stock
             foreach ($order_items_to_save as $item) {
-                $this->connection->executeStatement(
-                    'INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)',
-                    [$order_id, $item['product_id'], $item['quantity'], number_format($item['price_at_purchase'], 2, '.', '')]
-                );
-                $this->connection->executeStatement(
-                    'UPDATE products SET product_stock_quantity = product_stock_quantity - ? WHERE product_id = ?',
-                    [$item['quantity'], $item['product_id']]
-                );
+                $order_item = (new OrderItem())
+                    ->setProduct($item['product'])
+                    ->setQuantity($item['quantity'])
+                    ->setPriceAtPurchase(number_format($item['price_at_purchase'], 2, '.', ''));
+                $order->addOrderItem($order_item);
+                $this->entityManager->persist($order_item);
+
+                // deduct the stock through the entity
+                $product = $item['product'];
+                $product->setProductStockQuantity($product->getProductStockQuantity() - $item['quantity']);
             }
 
-            $this->connection->commit();
+            $this->entityManager->persist($order);
+            $this->entityManager->flush();
 
             // clear the session cart
             $request->getSession()->set('cart', []);
 
             // redirect to the order summary
-            return $this->redirectToRoute('app_checkout_summary', ['order_id' => $order_id, 'placed' => 1]);
+            return $this->redirectToRoute('app_checkout_summary', ['order_id' => $order->getId(), 'placed' => 1]);
         } catch (\Throwable $e) {
-            if ($this->connection->isTransactionActive()) {
-                $this->connection->rollBack();
-            }
             $this->addFlash('error', 'Failed to process order: ' . $e->getMessage());
 
             return $this->redirectToRoute('app_checkout');
@@ -402,27 +373,22 @@ final class CheckoutController extends AbstractController
         }
 
         $pids = array_map('intval', array_keys($cart));
-        $placeholders = implode(',', array_fill(0, count($pids), '?'));
-        $rows = $this->connection->fetchAllAssociative(
-            "SELECT * FROM products WHERE product_id IN ($placeholders)",
-            $pids
-        );
 
-        foreach ($rows as $row) {
-            $product_id = (int) $row['product_id'];
+        foreach ($this->productRepository->findBy(['id' => $pids]) as $product) {
+            $product_id = $product->getId();
             $qty = (int) ($cart[$product_id] ?? 1);
-            $unit_price = (float) $row['product_price'];
+            $unit_price = (float) $product->getProductPrice();
             $line_total = $unit_price * $qty;
             $subtotal += $line_total;
 
             $cart_items[] = [
                 'id' => $product_id,
-                'name' => $row['product_name'],
+                'name' => $product->getProductName(),
                 'price' => $unit_price,
-                'stock' => (int) $row['product_stock_quantity'],
+                'stock' => $product->getProductStockQuantity(),
                 'qty' => $qty,
                 'line_total' => $line_total,
-                'image_url' => $this->resolveImageUrl($row['product_img'] ?: null),
+                'image_url' => $this->resolveImageUrl($product->getProductImg() ?: null),
             ];
         }
 

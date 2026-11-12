@@ -1,32 +1,33 @@
 {# product card component
-   clean little card rendering for the shop catalog (port of prev/classes/ProductCard.php) #}
-{% set stock = product.product_stock_quantity|default(0)|round(0, 'floor') %}
+   clean little card rendering for the shop catalog (port of prev/classes/ProductCard.php)
+   receives a Product entity, with the controller-resolved imageUrl decorated on #}
+{% set stock = product.productStockQuantity|default(0)|round(0, 'floor') %}
 {% set in_stock = stock > 0 %}
 {% set stock_class = in_stock ? (stock <= 5 ? 'stock-low' : 'stock-ok') : 'stock-out' %}
 {% set stock_label = in_stock ? (stock <= 5 ? "Only #{stock} left" : 'In Stock') : 'Out of Stock' %}
-{% set img_src = product.image_url|default(false) ? asset(product.image_url) : asset('images/3.png') %}
+{% set img_src = product.imageUrl ? asset(product.imageUrl) : asset('images/3.png') %}
 
 {# fallback placeholder image if none set or not found #}
 <div class="shop-product-card {{ in_stock ? '' : 'out-of-stock-card' }}"
      {% if in_stock and not banned %}data-product-card="true"{% endif %}
-     data-id="{{ product.product_id }}"
-     data-name="{{ product.product_name }}"
-     data-price="{{ product.product_price }}"
+     data-id="{{ product.id }}"
+     data-name="{{ product.productName }}"
+     data-price="{{ product.productPrice }}"
      data-stock="{{ stock }}"
      data-image="{{ img_src }}">
     <div class="product-card-image-wrap">
-        <img src="{{ img_src }}" alt="{{ product.product_name }}" loading="lazy">
+        <img src="{{ img_src }}" alt="{{ product.productName }}" loading="lazy">
         <span class="product-stock-pill {{ stock_class }}">{{ stock_label }}</span>
     </div>
 
     <div class="product-card-info">
-        <h3 class="product-card-name">{{ product.product_name }}</h3>
-        {% if product.product_description %}
-            <p class="product-card-desc">{{ product.product_description }}</p>
+        <h3 class="product-card-name">{{ product.productName }}</h3>
+        {% if product.productDescription %}
+            <p class="product-card-desc">{{ product.productDescription }}</p>
         {% endif %}
 
         <div class="product-card-footer">
-            <div class="product-card-price">₱{{ product.product_price|number_format(2) }}</div>
+            <div class="product-card-price">₱{{ product.productPrice|number_format(2) }}</div>
 
             {% if not in_stock %}
                 <button type="button" class="btn-product-action disabled" disabled>

@@ -2,9 +2,10 @@
 
 namespace App\Controller;
 
+use App\Entity\OrderItem;
 use App\Entity\User;
+use App\Repository\OrderRepository;
 use App\Service\FileUploader;
-use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Request;
@@ -15,7 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class CheckoutSummaryController extends AbstractController
 {
     public function __construct(
-        private readonly Connection $connection,
+        private readonly OrderRepository $orderRepository,
         private readonly FileUploader $fileUploader,
         #[Autowire(param: 'kernel.project_dir')]
         private readonly string $projectDir,
@@ -41,36 +42,25 @@ final class CheckoutSummaryController extends AbstractController
             return $this->redirectToRoute('app_shop');
         }
 
-        // fetch order details with the customer
-        $order = $this->connection->fetchAssociative('
-            SELECT o.*, u.user_name, u.user_email, u.user_role
-            FROM orders o
-            LEFT JOIN users u ON o.user_id = u.user_id
-            WHERE o.order_id = ?
-            LIMIT 1
-        ', [$order_id]);
+        $order = $this->orderRepository->find($order_id);
 
         if (!$order) {
             throw $this->createNotFoundException('Order not found');
         }
 
         // access control: user can only view their own order, unless they are an admin
-        if (!$is_admin && (int) $order['user_id'] !== $user->getId()) {
+        if (!$is_admin && $order->getUser()?->getId() !== $user->getId()) {
             return $this->redirectToRoute('app_account');
         }
 
-        // fetch order items with their product names
-        $items = $this->connection->fetchAllAssociative('
-            SELECT oi.*, p.product_name, p.product_img
-            FROM order_items oi
-            LEFT JOIN products p ON oi.product_id = p.product_id
-            WHERE oi.order_id = ?
-            ORDER BY oi.item_id ASC
-        ', [$order_id]);
+        // order items in insertion order (the collection itself is unordered)
+        $items = $order->getOrderItems()->toArray();
+        usort($items, static fn (OrderItem $a, OrderItem $b) => $a->getId() <=> $b->getId());
 
         // resolve each item image url server side so the table row stays dumb
-        foreach ($items as $i => $item) {
-            $items[$i]['image_url'] = $this->resolveImageUrl($item['product_img'] ?: null);
+        foreach ($items as $item) {
+            $product = $item->getProduct();
+            $product->setImageUrl($this->resolveImageUrl($product->getProductImg() ?: null));
         }
 
         return $this->render('checkout_summary/index.html.twig', [

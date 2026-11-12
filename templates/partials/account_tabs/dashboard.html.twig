@@ -69,21 +69,21 @@
                         <td colspan="6" class="empty-table-cell">No recent orders found.</td>
                     </tr>
                 {% else %}
-                    {% for order in recent_orders %}  
+                    {% for order in recent_orders %}
                         <tr>
-                            <td><strong>#{{ '%05d'|format(order.order_id) }}</strong></td>
+                            <td><strong>#{{ '%05d'|format(order.id) }}</strong></td>
                             <td>
-                                <strong>{{ order.user_name|default('Unknown') }}</strong>
-                                <span class="cell-email" title="{{ order.user_email|default('') }}" style="display: block; font-size: 0.8rem; color: var(--palette-gray);">{{ (order.user_email|default(''))|middle_truncate }}</span>
+                                <strong>{{ order.user.username|default('Unknown') }}</strong>
+                                <span class="cell-email" title="{{ order.user.email|default('') }}" style="display: block; font-size: 0.8rem; color: var(--palette-gray);">{{ (order.user.email|default(''))|middle_truncate }}</span>
                             </td>
-                            <td>{{ order.order_date|date('M d, Y · h:i A') }}</td>
-                            <td><strong>₱{{ order.total_amount|number_format(2) }}</strong></td>
+                            <td>{{ order.orderDate|date('M d, Y · h:i A') }}</td>
+                            <td><strong>₱{{ order.totalAmount|number_format(2) }}</strong></td>
 
                             <td>
-                                {{ badge(order.status ?? null) }}
+                                {{ badge(order.status) }}
                             </td>
                             <td style="text-align: right;">
-                                <a href="{{ path('app_checkout_summary', { order_id: order.order_id }) }}" class="table-btn-action primary" style="text-decoration: none; display: inline-flex; padding: 6px 12px; font-size: 0.8rem;" title="View Order Summary">
+                                <a href="{{ path('app_checkout_summary', { order_id: order.id }) }}" class="table-btn-action primary" style="text-decoration: none; display: inline-flex; padding: 6px 12px; font-size: 0.8rem;" title="View Order Summary">
                                     <i class="fa-solid fa-file-invoice"></i> View
                                 </a>
                             </td>

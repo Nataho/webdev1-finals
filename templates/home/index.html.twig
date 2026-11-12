@@ -87,42 +87,29 @@
     </section>
 
     <!-- FEEDBACK -->
+    {% if feedback_items %}
     <section class="section-wrapper">
         <h1 id="fourth-heading" class="section-heading">Feedback</h1>
         <div class="feedback-container">
-
-            <div class="feedback-card">
-                <h2>"Amazing natural skincare! My sensitive skin feels so soft."</h2>
-                <div class="profile">
-                    <img src="{{asset("images/sam.png")}}" alt="sam">
-                    <div>
-                        <p class="profile-name">Sam Rich John L. Orcullo</p>
-                        <p>Customer</p>
+            {% for feedback in feedback_items %}
+                <div class="feedback-card">
+                    <h2>&ldquo;{{ feedback.message }}&rdquo;</h2>
+                    <div class="profile">
+                        {% if feedback.avatarUrl %}
+                            <img src="{{ asset(feedback.avatarUrl) }}" alt="{{ feedback.name }}">
+                        {% else %}
+                            <img src="{{ asset('images/3.png') }}" alt="">
+                        {% endif %}
+                        <div>
+                            <p class="profile-name">{{ feedback.name }}</p>
+                            <p>{{ feedback.roleLabel }}</p>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="feedback-card">
-                <h2>"My skin feels bouncier and looks brighter"</h2>
-                <div class="profile">
-                    <img src="{{asset("images/enric.png")}}" alt="enric">
-                    <div>
-                        <p class="profile-name">Enric Myg O. Teope</p>
-                        <p>Customer</p>
-                    </div>
-                </div>
-            </div>
-            <div class="feedback-card">
-                <h2>"All these products smell so nice"</h2>
-                <div class="profile">
-                    <img src="{{asset("images/sheena.png")}}" alt="sheena">
-                    <div>
-                        <p class="profile-name">Sheena F. Rentuaya</p>
-                        <p>Customer</p>
-                    </div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
     </section>
+    {% endif %}
     <section class="white-bg">
         <div class="section-wrapper" id="center-all">
             <h1 id="fifth-heading" class="section-heading">Become a Prototype Tester!</h1>

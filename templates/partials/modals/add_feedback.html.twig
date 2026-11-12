@@ -1,0 +1,42 @@
+{# Add-testimonial modal — the create form as a dialog, opened from the Testimonials tab. #}
+<div id="addFeedbackModal" class="confirm-modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="confirm-modal-box wide-modal">
+        <div class="confirm-modal-body">
+            <h2 style="margin: 0 0 4px 0;"><i class="fa-solid fa-comment-dots"></i> Add Testimonial</h2>
+            <p class="subtext" style="margin: 0 0 16px 0;">A customer quote shown in the home page feedback section.</p>
+
+            <form class="account-form" method="POST" action="{{ path('app_account', { tab: 'feedback' }) }}" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="add_feedback">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('add_feedback') }}">
+
+                <div class="account-field">
+                    <label for="new_feedback_name">Customer Name *</label>
+                    <input type="text" id="new_feedback_name" name="feedback_name" placeholder="e.g. Maria Santos" required minlength="3" maxlength="120">
+                </div>
+
+                <div class="account-field">
+                    <label for="new_feedback_message">Testimonial *</label>
+                    <textarea id="new_feedback_message" name="feedback_message" rows="3" required maxlength="200" placeholder="e.g. My skin feels bouncier and looks brighter."></textarea>
+                </div>
+
+                <div class="form-row-2col">
+                    <div class="account-field">
+                        <label for="new_feedback_role">Shown As</label>
+                        <input type="text" id="new_feedback_role" name="feedback_role_label" value="Customer" maxlength="60">
+                    </div>
+                    <div class="account-field">
+                        <label for="new_feedback_avatar">Photo (optional)</label>
+                        <input type="file" id="new_feedback_avatar" name="feedback_avatar" accept="image/*">
+                    </div>
+                </div>
+
+                <div class="confirm-modal-actions" style="margin-top: 18px;">
+                    <button type="button" class="btn-modal-cancel" onclick="ConfirmModal.close('addFeedbackModal')">Cancel</button>
+                    <button type="submit" class="btn-modal-confirm">
+                        <i class="fa-solid fa-plus"></i> Add Testimonial
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

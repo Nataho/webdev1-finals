@@ -80,7 +80,7 @@
                     <i class="fa-solid fa-location-dot"></i> Addresses
                 </a>
                 <a href="?tab=logs" class="account-nav-tab {{ active_tab == 'logs' ? 'active' : '' }}">
-                    <i class="fa-solid fa-clock-rotate-left"></i> {% if is_granted("ROLE_ADMIN") %} Store Logs & Orders {% else %} My Orders {% endif %}
+                    <i class="fa-solid fa-clock-rotate-left"></i> {% if is_granted("ROLE_STAFF") %} Store Logs & Orders {% else %} My Orders {% endif %}
                 </a>
 
                 {% if is_granted("ROLE_ADMIN") %}
@@ -91,6 +91,14 @@
                     <a href="?tab=users" class="account-nav-tab {{ active_tab == 'users' ? 'active' : '' }}">
                         <i class="fa-solid fa-users"></i> Manage Users
                     </a>
+                    <a href="?tab=stock" class="account-nav-tab {{ active_tab == 'stock' ? 'active' : '' }}">
+                        <i class="fa-solid fa-boxes-stacked"></i> Stock & Inventory
+                    </a>
+                    <a href="?tab=add_product" class="account-nav-tab {{ active_tab == 'add_product' ? 'active' : '' }}">
+                        <i class="fa-solid fa-plus-circle"></i> Add New Product
+                    </a>
+                {% elseif is_granted("ROLE_STAFF") %}
+                    <div class="nav-group-title">Staff Controls</div>
                     <a href="?tab=stock" class="account-nav-tab {{ active_tab == 'stock' ? 'active' : '' }}">
                         <i class="fa-solid fa-boxes-stacked"></i> Stock & Inventory
                     </a>
@@ -177,7 +185,7 @@
     </script>
 {% endif %}
 
-{% if is_granted('ROLE_ADMIN') %}
+{% if is_granted('ROLE_STAFF') %}
     {% include 'partials/modals/confirm_type.html.twig' with {
         id: 'deleteProductModal',
         message: 'Are you sure you want to permanently delete this product? This cannot be undone.',
@@ -189,7 +197,9 @@
         hidden: { action: 'delete_product', product_id: '' },
         csrf_token_id: 'delete_product',
     } %}
+{% endif %}
 
+{% if is_granted('ROLE_ADMIN') %}
     {% include 'partials/modals/confirm_type.html.twig' with {
         id: 'deleteUserModal',
         message: 'Are you sure you want to permanently delete this user account? This cannot be undone.',
@@ -225,14 +235,18 @@
 
 {% include 'partials/modals/scripts.html.twig' %}
 
-{% if is_granted('ROLE_ADMIN') %}
+{% if is_granted('ROLE_STAFF') %}
 <script>
     // set the product_id in the delete product modal before opening it
     function prepareDeleteProduct(productId) {
         document.querySelector('#deleteProductModal input[name="product_id"]').value = productId;
         ConfirmTypeModal.open('deleteProductModal');
     }
+</script>
+{% endif %}
 
+{% if is_granted('ROLE_ADMIN') %}
+<script>
     // set the target_user_id in the delete user modal before opening it
     function prepareDeleteUser(userId) {
         document.querySelector('#deleteUserModal input[name="target_user_id"]').value = userId;

@@ -62,15 +62,20 @@ final class AccountController extends AbstractController
 
         // determine active tab
         $allowed_tabs = ['general', 'payment_options', 'addresses', 'logs'];
+        $isStaff = $this->isGranted('ROLE_STAFF');
         if ($isAdmin) {
             $allowed_tabs = array_merge(['dashboard'], $allowed_tabs, ['users', 'stock', 'add_product']);
+        } elseif ($isStaff) {
+            // staff are the shop's product managers: catalog tabs, no dashboard/users
+            $allowed_tabs = array_merge($allowed_tabs, ['stock', 'add_product']);
         }
         $default_tab = $isAdmin ? 'dashboard' : 'general';
         $active_tab = $request->query->get('tab', $default_tab);
 
         if (!in_array($active_tab, $allowed_tabs, true)) {
             // staff/customers poking an admin tab get a visible denial, not a silent fallback
-            if (!$isAdmin && in_array($active_tab, ['dashboard', 'users', 'stock', 'add_product'], true)) {
+            $denied_tabs = $isAdmin ? [] : ($isStaff ? ['dashboard', 'users'] : ['dashboard', 'users', 'stock', 'add_product']);
+            if (in_array($active_tab, $denied_tabs, true)) {
                 $this->addFlash('error', 'You do not have permission to open that area.');
             }
             $active_tab = $default_tab;
@@ -113,7 +118,8 @@ final class AccountController extends AbstractController
                 $status_filter = null;
             }
 
-            if ($isAdmin) {
+            if ($isAdmin || $isStaff) {
+                // admins and staff both see the full store order log; only admins may change statuses
                 $sql = 'SELECT o.*, u.user_name, u.user_email FROM orders o LEFT JOIN users u ON o.user_id = u.user_id';
                 $params = [];
                 if ($status_filter !== null) {
@@ -169,18 +175,22 @@ final class AccountController extends AbstractController
             }
         }
 
-        // fetch data for the stock tab (admin only)
+        // fetch data for the stock tab (admins and staff share the catalog view)
         $stock_q = trim($request->query->getString('stock_q'));
         $admin_products_list = [];
-        if ($active_tab === 'stock' && $isAdmin) {
+        if ($active_tab === 'stock' && ($isAdmin || $isStaff)) {
             if ($stock_q !== '') {
                 $admin_products_list = $this->connection->fetchAllAssociative(
-                    'SELECT * FROM products WHERE product_name LIKE ? ORDER BY product_id DESC',
+                    'SELECT p.*, u.user_name AS product_created_by_name
+                    FROM products p LEFT JOIN users u ON u.user_id = p.product_created_by
+                    WHERE p.product_name LIKE ? ORDER BY p.product_id DESC',
                     ['%'.$stock_q.'%']
                 );
             } else {
                 $admin_products_list = $this->connection->fetchAllAssociative(
-                    'SELECT * FROM products ORDER BY product_id DESC'
+                    'SELECT p.*, u.user_name AS product_created_by_name
+                    FROM products p LEFT JOIN users u ON u.user_id = p.product_created_by
+                    ORDER BY p.product_id DESC'
                 );
             }
         }
@@ -231,15 +241,21 @@ final class AccountController extends AbstractController
             'create_user',
             'edit_user',
             'delete_user',
-            'update_stock',
-            'add_product',
-            'delete_product',
             'update_order_status',
         ];
         if (in_array($action, $admin_actions, true) && !$isAdmin) {
             $this->addFlash('error', 'You do not have permission to do that.');
 
             return $redirect('update_order_status' === $action ? ['tab' => 'logs'] : []);
+        }
+
+        // product management is staff work too; only plain customers bounce here.
+        // staff still face per-row ownership checks inside the actions themselves
+        $product_actions = ['update_stock', 'add_product', 'delete_product'];
+        if (in_array($action, $product_actions, true) && !$isAdmin && !$this->isGranted('ROLE_STAFF')) {
+            $this->addFlash('error', 'You do not have permission to do that.');
+
+            return $redirect();
         }
 
         // every action requires a valid CSRF token
@@ -258,9 +274,9 @@ final class AccountController extends AbstractController
             'create_user' => $this->createUser($request, $redirect),
             'edit_user' => $this->editUser($request, $user, $redirect),
             'delete_user' => $this->deleteUser($request, $user, $redirect),
-            'update_stock' => $this->updateStock($request, $redirect),
+            'update_stock' => $this->updateStock($request, $user, $isAdmin, $redirect),
             'add_product' => $this->addProduct($request, $user, $redirect),
-            'delete_product' => $this->deleteProduct($request, $redirect),
+            'delete_product' => $this->deleteProduct($request, $user, $isAdmin, $redirect),
             'update_payment_options' => $this->updatePaymentOptions($request, $user, $redirect),
             'remove_payment_option' => $this->removePaymentOption($request, $user, $redirect),
             'add_address' => $this->addAddress($request, $user, $redirect),
@@ -669,13 +685,19 @@ final class AccountController extends AbstractController
         return $redirect($tab);
     }
 
-    private function updateStock(Request $request, \Closure $redirect): Response
+    private function updateStock(Request $request, User $user, bool $isAdmin, \Closure $redirect): Response
     {
         $product_id = $request->getPayload()->getInt('product_id');
         $new_stock = $request->getPayload()->getInt('new_stock');
 
         if ($product_id <= 0 || $new_stock < 0) {
             $this->addFlash('error', 'Invalid stock quantity entered.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        if (!$this->canManageProduct($product_id, $user, $isAdmin)) {
+            $this->addFlash('error', 'You can only manage products you created.');
 
             return $redirect(['tab' => 'stock']);
         }
@@ -716,20 +738,26 @@ final class AccountController extends AbstractController
         }
 
         $this->connection->executeStatement(
-            'INSERT INTO products (product_name, product_description, product_price, product_stock_quantity, product_img) VALUES (?, ?, ?, ?, ?)',
-            [$p_name, $p_desc, $p_price, $p_stock, $p_img]
+            'INSERT INTO products (product_name, product_description, product_price, product_stock_quantity, product_img, product_created_by) VALUES (?, ?, ?, ?, ?, ?)',
+            [$p_name, $p_desc, $p_price, $p_stock, $p_img, $user->getId()]
         );
         $this->addFlash('success', "Product '{$p_name}' added to store inventory!");
 
         return $redirect(['tab' => 'stock']);
     }
 
-    private function deleteProduct(Request $request, \Closure $redirect): Response
+    private function deleteProduct(Request $request, User $user, bool $isAdmin, \Closure $redirect): Response
     {
         $product_id = $request->getPayload()->getInt('product_id');
 
         if ($product_id <= 0) {
             $this->addFlash('error', 'Invalid product specified for deletion.');
+
+            return $redirect(['tab' => 'stock']);
+        }
+
+        if (!$this->canManageProduct($product_id, $user, $isAdmin)) {
+            $this->addFlash('error', 'You can only delete products you created.');
 
             return $redirect(['tab' => 'stock']);
         }
@@ -746,6 +774,23 @@ final class AccountController extends AbstractController
         }
 
         return $redirect(['tab' => 'stock']);
+    }
+
+    /**
+     * Admins manage every catalog row; staff only the products they created.
+     */
+    private function canManageProduct(int $product_id, User $user, bool $isAdmin): bool
+    {
+        if ($isAdmin) {
+            return true;
+        }
+
+        $owner_id = $this->connection->fetchOne(
+            'SELECT product_created_by FROM products WHERE product_id = ?',
+            [$product_id]
+        );
+
+        return false !== $owner_id && null !== $owner_id && (int) $owner_id === $user->getId();
     }
 
     private function updatePaymentOptions(Request $request, User $user, \Closure $redirect): Response

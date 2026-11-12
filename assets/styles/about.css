@@ -59,9 +59,31 @@
 @media (max-width: 768px) {
     .founder-card-wrapper {
         padding: 30px 20px;
+        /* the 260px desktop portrait nearly fills the card at 400px */
+        --photo-size: 200px;
+    }
+
+    .spotlight-message h1,
+    .profile-message h1,
+    .owner-message h1 {
+        font-size: 1.6rem;
+    }
+
+    #mission-section .section-heading {
+        font-size: 1.7rem;
     }
 
     #mission-description {
         font-size: 1.05rem;
+    }
+
+    /* about.css loads after app.css and these selectors out-rank the shared
+       overlay rules, so the hero sizes are restated here at the same specificity */
+    .about-us-image-container .overlay-content.center h1 {
+        font-size: 1.7rem;
+    }
+
+    .about-us-image-container .overlay-content.center p {
+        font-size: 0.95rem;
     }
 }

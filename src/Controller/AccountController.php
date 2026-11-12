@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 final class AccountController extends AbstractController
 {
@@ -49,6 +50,26 @@ final class AccountController extends AbstractController
 
     #[Route('/account', name: 'app_account')]
     public function index(Request $request): Response
+    {
+        $this->denyAccessUnlessGranted('ROLE_USER');
+
+        return $this->renderAccountPage($request);
+    }
+
+    /**
+     * Admin-only mirror of the account page. The dedicated /admin path is what
+     * the security.yaml "^/admin → ROLE_ADMIN" rule protects, so non-admins are
+     * stopped by the firewall before any controller code runs. Same page,
+     * stricter door.
+     */
+    #[Route('/admin/account', name: 'app_admin_account')]
+    #[IsGranted('ROLE_ADMIN', message: 'Only administrators may open the admin area.')]
+    public function adminAccount(Request $request): Response
+    {
+        return $this->renderAccountPage($request);
+    }
+
+    private function renderAccountPage(Request $request): Response
     {
         $this->denyAccessUnlessGranted('ROLE_USER');
 
@@ -228,7 +249,9 @@ final class AccountController extends AbstractController
     private function handleAction(Request $request, User $user, bool $isAdmin): ?Response
     {
         $action = $request->getPayload()->getString('action');
-        $redirect = fn (array $params = []): Response => $this->redirectToRoute('app_account', $params);
+        // admins working through /admin/account stay on the admin surface after POST redirects
+        $redirect_route = 'app_admin_account' === $request->attributes->get('_route') ? 'app_admin_account' : 'app_account';
+        $redirect = fn (array $params = []): Response => $this->redirectToRoute($redirect_route, $params);
 
         if (!in_array($action, self::CSRF_ACTIONS, true)) {
             return null;

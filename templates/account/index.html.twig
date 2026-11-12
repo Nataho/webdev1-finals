@@ -85,10 +85,10 @@
 
                 {% if is_granted("ROLE_ADMIN") %}
                     <div class="nav-group-title">Admin Controls</div>
-                    <a href="?tab=dashboard" class="account-nav-tab {{ active_tab == 'dashboard' ? 'active' : '' }}">
+                    <a href="{{ path('app_admin_account', { tab: 'dashboard' }) }}" class="account-nav-tab {{ active_tab == 'dashboard' ? 'active' : '' }}">
                         <i class="fa-solid fa-chart-line"></i> Dashboard
                     </a>
-                    <a href="?tab=users" class="account-nav-tab {{ active_tab == 'users' ? 'active' : '' }}">
+                    <a href="{{ path('app_admin_account', { tab: 'users' }) }}" class="account-nav-tab {{ active_tab == 'users' ? 'active' : '' }}">
                         <i class="fa-solid fa-users"></i> Manage Users
                     </a>
                     <a href="?tab=stock" class="account-nav-tab {{ active_tab == 'stock' ? 'active' : '' }}">
